@@ -1,5 +1,6 @@
 import React from "react";
 import { FaGoogle } from 'react-icons/fa';
+import {ConnectButton} from '@suiet/wallet-kit';
 
 const SignupPage: React.FC = () => {
 
@@ -9,6 +10,7 @@ const SignupPage: React.FC = () => {
       <div>
         Sign up
       </div>
+      <ConnectButton />
     </div>
   );
 };
