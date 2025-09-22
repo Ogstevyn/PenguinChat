@@ -1,49 +1,29 @@
-import React, { useState, useRef } from "react";
-import { Button } from "./ui/button";
+import React, { useState, useRef } from 'react';
+import { Button } from './ui/button';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
   disabled?: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({
-  onSendMessage,
-  disabled = false,
-}) => {
-  const [message, setMessage] = useState("");
+const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false }) => {
+  const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const emojis = [
-    "😀",
-    "😂",
-    "❤️",
-    "👍",
-    "👎",
-    "😢",
-    "😡",
-    "🎉",
-    "🔥",
-    "💯",
-    "👀",
-    "🤔",
-    "😅",
-    "🥳",
-    "🙌",
-    "💪",
-  ];
+  const emojis = ['😀', '😂', '❤️', '👍', '👎', '😢', '😡', '🎉', '🔥', '💯', '👀', '🤔', '😅', '🥳', '🙌', '💪'];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
       onSendMessage(message.trim());
-      setMessage("");
+      setMessage('');
       setShowEmojiPicker(false);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
@@ -56,7 +36,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
       const end = textarea.selectionEnd;
       const newValue = message.slice(0, start) + emoji + message.slice(end);
       setMessage(newValue);
-
+      
       // Reset cursor position after emoji
       setTimeout(() => {
         textarea.setSelectionRange(start + emoji.length, start + emoji.length);
@@ -98,11 +78,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               className="m-2 w-8 h-8 rounded-lg hover:bg-secondary/80 smooth-transition"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z"
-                  clipRule="evenodd"
-                />
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clipRule="evenodd" />
               </svg>
             </Button>
 
@@ -117,14 +93,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
               className="flex-1 bg-transparent border-none outline-none resize-none py-3 px-2 text-foreground placeholder-muted-foreground min-h-[20px] max-h-32 leading-relaxed"
               rows={1}
               style={{
-                height: "auto",
-                minHeight: "20px",
-                maxHeight: "128px",
+                height: 'auto',
+                minHeight: '20px',
+                maxHeight: '128px',
               }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
-                target.style.height = "auto";
-                target.style.height = Math.min(target.scrollHeight, 128) + "px";
+                target.style.height = 'auto';
+                target.style.height = Math.min(target.scrollHeight, 128) + 'px';
               }}
             />
 
@@ -136,11 +112,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               className="m-2 w-8 h-8 rounded-lg hover:bg-secondary/80 smooth-transition"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
-                  clipRule="evenodd"
-                />
+                <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
               </svg>
             </Button>
           </div>

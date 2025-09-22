@@ -1,8 +1,9 @@
-import React from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
-import { Button } from "./ui/button";
-import { FaChevronLeft } from "react-icons/fa";
+import React from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { Button } from './ui/button';
+import { FaChevronLeft } from 'react-icons/fa';
+
 
 interface ChatHeaderProps {
   isOnline?: boolean;
@@ -11,12 +12,7 @@ interface ChatHeaderProps {
   chatAvatar: string;
 }
 
-const ChatHeader: React.FC<ChatHeaderProps> = ({
-  isOnline = true,
-  onBack,
-  chatName,
-  chatAvatar,
-}) => {
+const ChatHeader: React.FC<ChatHeaderProps> = ({ isOnline = true, onBack, chatName, chatAvatar}) => {
   const { logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
@@ -45,17 +41,15 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             />
             <div
               className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-chat-header ${
-                isOnline ? "bg-green-500" : "bg-gray-400"
+                isOnline ? 'bg-green-500' : 'bg-gray-400'
               }`}
             />
           </div>
 
           <div>
-            <h1 className="font-semibold text-foreground text-lg">
-              {chatName}
-            </h1>
+            <h1 className="font-semibold text-foreground text-lg">{chatName}</h1>
             <p className="text-xs text-muted-foreground">
-              {isOnline ? "Online" : "Last seen recently"}
+              {isOnline ? 'Online' : 'Last seen recently'}
             </p>
           </div>
         </div>
@@ -70,7 +64,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             className="w-10 h-10 rounded-xl hover:bg-secondary/80 smooth-transition"
             aria-label="Toggle theme"
           >
-            {theme === "light" ? (
+            {theme === 'light' ? (
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"

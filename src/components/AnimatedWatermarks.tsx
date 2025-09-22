@@ -1,54 +1,47 @@
-import React from "react";
-import { motion } from "framer-motion";
-import {
-  MessageCircle,
-  Smartphone,
-  Users,
-  Mail,
-  MapPin,
-  Wifi,
-} from "lucide-react";
+import React from 'react';
+import { motion } from 'framer-motion';
+import { MessageCircle, Smartphone, Users, Mail, MapPin, Wifi } from 'lucide-react';
 
 const AnimatedWatermarks: React.FC = () => {
   const watermarkElements = [
     {
       icon: MessageCircle,
-      position: { x: "10%", y: "20%" },
+      position: { x: '10%', y: '20%' },
       size: 60,
       delay: 0,
       duration: 8,
     },
     {
       icon: Smartphone,
-      position: { x: "85%", y: "15%" },
+      position: { x: '85%', y: '15%' },
       size: 50,
       delay: 1,
       duration: 6,
     },
     {
       icon: Users,
-      position: { x: "15%", y: "70%" },
+      position: { x: '15%', y: '70%' },
       size: 55,
       delay: 2,
       duration: 10,
     },
     {
       icon: Mail,
-      position: { x: "80%", y: "65%" },
+      position: { x: '80%', y: '65%' },
       size: 45,
       delay: 0.5,
       duration: 7,
     },
     {
       icon: MapPin,
-      position: { x: "90%", y: "45%" },
+      position: { x: '90%', y: '45%' },
       size: 40,
       delay: 1.5,
       duration: 9,
     },
     {
       icon: Wifi,
-      position: { x: "5%", y: "45%" },
+      position: { x: '5%', y: '45%' },
       size: 35,
       delay: 2.5,
       duration: 5,
@@ -61,27 +54,27 @@ const AnimatedWatermarks: React.FC = () => {
       <motion.div
         className="absolute inset-0 flex items-center justify-center"
         initial={{ opacity: 0, scale: 0.8, rotateX: 45 }}
-        animate={{
-          opacity: 0.03,
-          scale: 1,
+        animate={{ 
+          opacity: 0.03, 
+          scale: 1, 
           rotateX: 0,
           rotateY: [0, 5, 0],
         }}
-        transition={{
+        transition={{ 
           duration: 2,
           rotateY: {
             duration: 20,
             repeat: Infinity,
-            ease: "easeInOut",
-          },
+            ease: "easeInOut"
+          }
         }}
       >
-        <h1
+        <h1 
           className="text-9xl font-serif font-bold text-primary select-none"
           style={{
-            fontSize: "clamp(8rem, 20vw, 16rem)",
-            transform: "perspective(1000px) rotateX(20deg)",
-            textShadow: "0 20px 40px rgba(30, 58, 138, 0.1)",
+            fontSize: 'clamp(8rem, 20vw, 16rem)',
+            transform: 'perspective(1000px) rotateX(20deg)',
+            textShadow: '0 20px 40px rgba(30, 58, 138, 0.1)',
           }}
         >
           HOMING
@@ -97,13 +90,13 @@ const AnimatedWatermarks: React.FC = () => {
             left: element.position.x,
             top: element.position.y,
           }}
-          initial={{
-            opacity: 0,
+          initial={{ 
+            opacity: 0, 
             scale: 0,
             rotateZ: -180,
             z: -100,
           }}
-          animate={{
+          animate={{ 
             opacity: [0.05, 0.15, 0.05],
             scale: [0.8, 1.2, 0.8],
             rotateZ: [0, 360],
@@ -120,15 +113,15 @@ const AnimatedWatermarks: React.FC = () => {
               duration: element.duration * 2,
               ease: "linear",
               repeat: Infinity,
-            },
+            }
           }}
         >
-          <element.icon
-            size={element.size}
+          <element.icon 
+            size={element.size} 
             className="text-primary filter blur-[0.5px]"
             style={{
-              filter: "drop-shadow(0 10px 20px rgba(30, 58, 138, 0.1))",
-              transform: "perspective(500px) rotateX(20deg)",
+              filter: 'drop-shadow(0 10px 20px rgba(30, 58, 138, 0.1))',
+              transform: 'perspective(500px) rotateX(20deg)',
             }}
           />
         </motion.div>
@@ -172,7 +165,7 @@ const AnimatedWatermarks: React.FC = () => {
           ease: "easeInOut",
         }}
       />
-
+      
       <motion.div
         className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-gradient-radial from-accent/15 to-transparent rounded-full blur-3xl"
         animate={{
@@ -207,12 +200,7 @@ const AnimatedWatermarks: React.FC = () => {
           className="text-accent"
           initial={{ pathLength: 0, opacity: 0 }}
           animate={{ pathLength: 1, opacity: 0.1 }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 2,
-          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
         />
       </svg>
     </div>
