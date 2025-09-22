@@ -3,10 +3,13 @@ import { BackupManager } from '../services/backupManager';
 import { MessageRecoveryService } from '../services/messageRecoveryService';
 import { LocalStorageService } from '../services/localStorageService';
 import { useAuth } from './AuthContext';
+import { ChatService } from '../services/chatService';
+
 
 interface BackupContextType {
   backupManager: BackupManager | null;
   recoveryService: MessageRecoveryService | null;
+  chatService: ChatService | null;
   isInitialized: boolean;
   pendingMessageCount: number;
   lastBackupTimestamp: number | null;
@@ -33,6 +36,7 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
   const { user } = useAuth();
   const [backupManager, setBackupManager] = useState<BackupManager | null>(null);
   const [recoveryService, setRecoveryService] = useState<MessageRecoveryService | null>(null);
+  const [chatService, setChatService] = useState<ChatService | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [pendingMessageCount, setPendingMessageCount] = useState(0);
   const [lastBackupTimestamp, setLastBackupTimestamp] = useState<number | null>(null);
@@ -61,17 +65,17 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
     try {
       if (!user?.id) return;
 
-      // Using dummy private key for testing
       const dummyPrivateKey = "suiprivkey1qpqywg8f9kdhcfs3j23l0g0ejljxdawmxkjyypfs58ggzuj5j5hhxy7gaex";
       
       const manager = new BackupManager(dummyPrivateKey);
       const recovery = new MessageRecoveryService(dummyPrivateKey);
+      const chat = new ChatService(dummyPrivateKey); // Add this
 
-      // Initialize user in backup system with 1 minute frequency for testing
-      await manager.initializeUser(user.id, 1); // 1 minute for testing
+      await manager.initializeUser(user.id, 1);
 
       setBackupManager(manager);
       setRecoveryService(recovery);
+      setChatService(chat); // Add this
       setIsInitialized(true);
 
       console.log('Backup system initialized for user:', user.id);
@@ -113,6 +117,7 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
   const value: BackupContextType = {
     backupManager,
     recoveryService,
+    chatService, // Add this
     isInitialized,
     pendingMessageCount,
     lastBackupTimestamp,

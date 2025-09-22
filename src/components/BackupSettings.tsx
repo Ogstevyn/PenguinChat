@@ -14,7 +14,8 @@ import {
   Settings, 
   CheckCircle, 
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Wallet
 } from 'lucide-react';
 
 export const BackupSettings: React.FC = () => {
@@ -67,7 +68,6 @@ export const BackupSettings: React.FC = () => {
       const blobId = await performBackup();
       if (blobId) {
         await loadBackupStatus();
-        // Show success message
         console.log('Manual backup successful:', blobId);
       }
     } catch (error) {
@@ -127,11 +127,11 @@ export const BackupSettings: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Database className="w-5 h-5" />
-            Backup Status
+            <Wallet className="w-5 h-5" />
+            Wallet Backup Status
           </CardTitle>
           <CardDescription>
-            Current status of your message backups
+            Your messages are backed up to your wallet on Sui's Walrus network
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -144,9 +144,9 @@ export const BackupSettings: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant={backupStatus?.hasBackups ? "default" : "outline"}>
-                {backupStatus?.hasBackups ? "Active" : "No backups"}
+                {backupStatus?.totalBackups || 0} backups
               </Badge>
-              <span className="text-sm text-muted-foreground">Backup Chain</span>
+              <span className="text-sm text-muted-foreground">In Wallet</span>
             </div>
           </div>
           
@@ -158,12 +158,9 @@ export const BackupSettings: React.FC = () => {
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Latest Blob ID:</span>
-              <span className="text-sm text-muted-foreground font-mono">
-                {backupStatus?.latestBlobId ? 
-                  `${backupStatus.latestBlobId.slice(0, 8)}...` : 
-                  'None'
-                }
+              <span className="text-sm font-medium">Total Backups:</span>
+              <span className="text-sm text-muted-foreground">
+                {backupStatus?.totalBackups || 0} objects in wallet
               </span>
             </div>
           </div>
@@ -274,13 +271,16 @@ export const BackupSettings: React.FC = () => {
               • Each backup contains only new messages since the last backup
             </p>
             <p>
-              • Backups are stored on Sui's Walrus network
+              • Backups are stored as objects in your wallet on Sui's Walrus network
             </p>
             <p>
-              • Each backup links to the previous one, creating a chain
+              • Your wallet automatically owns all backup objects
             </p>
             <p>
               • You can recover your complete message history anytime
+            </p>
+            <p>
+              • No external databases needed - everything is on-chain
             </p>
           </div>
         </CardContent>

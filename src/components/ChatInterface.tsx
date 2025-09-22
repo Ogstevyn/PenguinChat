@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import ChatHeader from './ChatHeader';
 import MessageBubble, { Message } from './MessageBubble';
 import ChatInput from './ChatInput';
+import { useBackup } from '../contexts/BackupContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ChatInterfaceProps {
   chatId: string;
@@ -15,78 +17,15 @@ const currentUser = {
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=You&backgroundColor=b6e3f4&radius=50',
 };
 
-// Mock conversation data with chatId
-const createInitialMessages = (chatId: string): Message[] => [
-  {
-    id: '1',
-    text: 'Hey! How are you doing today?',
-    timestamp: new Date(Date.now() - 3600000),
-    isSent: false,
-    isRead: true,
-    chatId,
-    sender: {
-      name: 'Sarah Chen',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede&radius=50'
-    }
-  },
-  {
-    id: '2',
-    text: "I'm doing great! Just working on some new features for our messenger app. How about you?",
-    timestamp: new Date(Date.now() - 3500000),
-    isSent: true,
-    isRead: true,
-    chatId,
-    sender: currentUser
-  },
-  {
-    id: '3',
-    text: 'That sounds exciting! I\'d love to hear more about it. What kind of features are you working on?',
-    timestamp: new Date(Date.now() - 3400000),
-    isSent: false,
-    isRead: true,
-    chatId,
-    sender: {
-      name: 'Sarah Chen',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede&radius=50'
-    }
-  },
-  {
-    id: '4',
-    text: 'We\'re implementing ZKLogin authentication and a beautiful dark/light theme system. The UI is really coming together nicely! 🎨',
-    timestamp: new Date(Date.now() - 3200000),
-    isSent: true,
-    isRead: true,
-    chatId,
-    sender: currentUser
-  },
-  {
-    id: '5',
-    text: 'Wow, ZKLogin sounds really cool! Is that for privacy-focused authentication?',
-    timestamp: new Date(Date.now() - 3000000),
-    isSent: false,
-    isRead: true,
-    chatId,
-    sender: {
-      name: 'Sarah Chen',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede&radius=50'
-    }
-  },
-  {
-    id: '6',
-    text: 'Exactly! It allows users to authenticate without revealing their private keys. Perfect for a secure messaging app like this one.',
-    timestamp: new Date(Date.now() - 2800000),
-    isSent: true,
-    isRead: false,
-    chatId,
-    sender: currentUser
-  }
-];
-
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAvatar, onBack }) => {
-  const [messages, setMessages] = useState<Message[]>(createInitialMessages(chatId));
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  
+  const { chatService } = useBackup();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -96,6 +35,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAva
     scrollToBottom();
   }, [messages]);
 
+  // Load messages when component mounts or chatId changes
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (!chatService || !user?.id) {
+        setIsLoadingMessages(false);
+        return;
+      }
+
+      setIsLoadingMessages(true);
+      try {
+        const chatMessages = await chatService.getChatMessages(user.id, chatId);
+        setMessages(chatMessages);
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+        setMessages([]);
+      } finally {
+        setIsLoadingMessages(false);
+      }
+    };
+
+    loadMessages();
+  }, [chatService, user?.id, chatId]);
+
   const handleSendMessage = async (text: string) => {
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -103,50 +65,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAva
       timestamp: new Date(),
       isSent: true,
       isRead: false,
-      chatId, // Include chatId
+      chatId,
       sender: currentUser,
     };
 
     setMessages((prev) => [...prev, newMessage]);
     setIsTyping(true);
 
+    // Simulate typing delay (you can remove this if you want instant responses)
     setTimeout(() => {
       setIsTyping(false);
-      const responses = [
-        "That's really interesting!",
-        "I totally agree with you.",
-        'Tell me more about that!',
-        'Sounds like a great idea 💡',
-        "I hadn't thought of it that way.",
-        'That makes a lot of sense!',
-        'Thanks for sharing that with me.',
-      ];
-      const randomResponse =
-        responses[Math.floor(Math.random() * responses.length)];
-
-      const responseMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: randomResponse,
-        timestamp: new Date(),
-        isSent: false,
-        isRead: true,
-        chatId, // Include chatId
-        sender: {
-          name: 'Sarah Chen',
-          avatar:
-            'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede&radius=50',
-        },
-      };
-
-      setMessages((prev) => [...prev, responseMessage]);
-
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === newMessage.id ? { ...msg, isRead: true } : msg
-          )
-        );
-      }, 2000);
+      // No demo responses - just stop typing
     }, 1500 + Math.random() * 2000);
   };
 
@@ -169,42 +98,49 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAva
           scrollbarColor: 'hsl(var(--muted-foreground)) transparent',
         }}
       >
-        <div className="flex justify-center mb-6">
-          <div className="bg-secondary/80 text-muted-foreground text-xs px-3 py-1 rounded-full">
-            Today
-          </div>
-        </div>
-
-        {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
-        ))}
-
-        {isTyping && (
-          <div className="flex justify-start mb-4">
-            <div className="flex items-center space-x-3">
-              <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede&radius=50"
-                alt="Sarah Chen"
-                className="w-8 h-8 rounded-full border-2 border-border"
-              />
-              <div className="bg-chat-bubble-received text-chat-bubble-received-foreground px-4 py-3 rounded-2xl rounded-bl-md">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"></div>
-                  <div
-                    className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"
-                    style={{ animationDelay: '0.2s' }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"
-                    style={{ animationDelay: '0.4s' }}
-                  ></div>
-                </div>
-              </div>
+        {isLoadingMessages ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-muted-foreground text-sm">Loading messages...</p>
             </div>
           </div>
-        )}
+        ) : (
+          <>
+            <div className="flex justify-center mb-6">
+              <div className="bg-secondary/80 text-muted-foreground text-xs px-3 py-1 rounded-full">
+                Today
+              </div>
+            </div>
 
-        <div ref={messagesEndRef} className="h-4" />
+            {/* Filter out welcome messages */}
+            {messages
+              .filter(message => !message.text.includes('Started conversation with'))
+              .map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
+
+            {isTyping && (
+              <div className="flex justify-start mb-4">
+                <div className="bg-chat-bubble-received text-chat-bubble-received-foreground px-4 py-3 rounded-2xl rounded-bl-md">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"></div>
+                    <div
+                      className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"
+                      style={{ animationDelay: '0.2s' }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"
+                      style={{ animationDelay: '0.4s' }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} className="h-4" />
+          </>
+        )}
       </div>
 
       <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />

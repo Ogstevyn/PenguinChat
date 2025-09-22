@@ -1,58 +1,66 @@
 import { WalrusService } from './walrusService';
-import { SupabaseService } from './supabaseService';
-import { Message, BackupData } from '../types/backup';
+import { Message, BackupData, SuiBlobObject } from '../types/backup';
 
 export class MessageRecoveryService {
   private walrusService: WalrusService;
-  private supabaseService: SupabaseService;
 
   constructor(privateKey: string) {
     this.walrusService = new WalrusService(privateKey);
-    this.supabaseService = new SupabaseService();
   }
 
+  /**
+   * Recover all messages for a user by querying their wallet objects
+   */
   async recoverUserMessages(userAddress: string): Promise<Message[]> {
     try {
       console.log(`Starting message recovery for ${userAddress}`);
       
-      // 1. Get latest blob ID from Supabase
-      const latestBlobId = await this.supabaseService.getLatestBlobId(userAddress);
+      // 1. Get all blob objects from user's wallet
+      const blobObjects = await this.walrusService.getUserBlobObjects(userAddress);
       
-      if (!latestBlobId) {
+      if (blobObjects.length === 0) {
         console.log('No backups found for user');
         return [];
       }
 
-      // 2. Follow the backup chain and collect all messages
-      const allMessages: Message[] = [];
-      let currentBlobId: string | null = latestBlobId;
-      let backupCount = 0;
+      console.log(`Found ${blobObjects.length} blob objects`);
 
-      while (currentBlobId) {
+      // 2. Download all backups and collect messages
+      const allMessages: Message[] = [];
+      
+      for (const blobObject of blobObjects) {
         try {
-          console.log(`Recovering backup ${++backupCount}: ${currentBlobId}`);
+          // Extract blob ID from the object
+          const blobId = this.extractBlobIdFromObject(blobObject);
           
-          // Download backup from Walrus
-          const backupData = await this.walrusService.downloadBackup(currentBlobId);
-          
-          // Extract messages from all conversations
-          Object.values(backupData.conversations).forEach(messages => {
-            allMessages.push(...messages);
-          });
-          
-          // Move to previous backup
-          currentBlobId = backupData.previousBlobId;
-          
+          if (blobId) {
+            console.log(`Recovering backup: ${blobId}`);
+            
+            // Download backup from Walrus
+            const backupData = await this.walrusService.downloadBackup(blobId);
+            
+            // 3. Filter out non-PenguinChat backups
+            if (this.isPenguinChatBackup(backupData)) {
+              console.log(`✅ Valid PenguinChat backup found: ${blobId}`);
+              
+              // Extract messages from all conversations
+              Object.values(backupData.conversations).forEach(messages => {
+                allMessages.push(...messages);
+              });
+            } else {
+              console.log(`⚠️ Skipping non-PenguinChat backup: ${blobId}`);
+            }
+          }
         } catch (error) {
-          console.error(`Failed to recover backup ${currentBlobId}:`, error);
-          break; // Stop if we can't recover a backup
+          console.error(`Failed to recover backup ${blobObject.objectId}:`, error);
+          // Continue with other backups
         }
       }
 
-      // 3. Sort messages by timestamp
+      // 4. Sort messages by timestamp
       allMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
-      console.log(`Recovered ${allMessages.length} messages from ${backupCount} backups`);
+      console.log(`Recovered ${allMessages.length} messages from ${blobObjects.length} blob objects`);
       return allMessages;
 
     } catch (error) {
@@ -84,9 +92,9 @@ export class MessageRecoveryService {
     totalMessages: number;
   }> {
     try {
-      const latestBlobId = await this.supabaseService.getLatestBlobId(userAddress);
+      const blobObjects = await this.walrusService.getUserBlobObjects(userAddress);
       
-      if (!latestBlobId) {
+      if (blobObjects.length === 0) {
         return {
           totalBackups: 0,
           latestBackupTimestamp: 0,
@@ -95,34 +103,37 @@ export class MessageRecoveryService {
         };
       }
 
-      let totalBackups = 0;
       let totalMessages = 0;
       let latestTimestamp = 0;
       let oldestTimestamp = Number.MAX_SAFE_INTEGER;
-      let currentBlobId: string | null = latestBlobId;
+      let validBackups = 0;
 
-      while (currentBlobId) {
+      for (const blobObject of blobObjects) {
         try {
-          const backupData = await this.walrusService.downloadBackup(currentBlobId);
-          
-          totalBackups++;
-          totalMessages += Object.values(backupData.conversations).reduce(
-            (sum, messages) => sum + messages.length, 0
-          );
-          
-          latestTimestamp = Math.max(latestTimestamp, backupData.timestamp);
-          oldestTimestamp = Math.min(oldestTimestamp, backupData.timestamp);
-          
-          currentBlobId = backupData.previousBlobId;
-          
+          const blobId = this.extractBlobIdFromObject(blobObject);
+          if (blobId) {
+            const backupData = await this.walrusService.downloadBackup(blobId);
+            
+            // Only count PenguinChat backups
+            if (this.isPenguinChatBackup(backupData)) {
+              validBackups++;
+              
+              totalMessages += Object.values(backupData.conversations).reduce(
+                (sum, messages) => sum + messages.length, 0
+              );
+              
+              latestTimestamp = Math.max(latestTimestamp, backupData.timestamp);
+              oldestTimestamp = Math.min(oldestTimestamp, backupData.timestamp);
+            }
+          }
         } catch (error) {
-          console.error(`Failed to get info for backup ${currentBlobId}:`, error);
-          break;
+          console.error(`Failed to get info for backup ${blobObject.objectId}:`, error);
+          // Continue with other backups
         }
       }
 
       return {
-        totalBackups,
+        totalBackups: validBackups,
         latestBackupTimestamp: latestTimestamp,
         oldestBackupTimestamp: oldestTimestamp === Number.MAX_SAFE_INTEGER ? 0 : oldestTimestamp,
         totalMessages
@@ -143,9 +154,9 @@ export class MessageRecoveryService {
     totalBackups: number;
   }> {
     try {
-      const latestBlobId = await this.supabaseService.getLatestBlobId(userAddress);
+      const blobObjects = await this.walrusService.getUserBlobObjects(userAddress);
       
-      if (!latestBlobId) {
+      if (blobObjects.length === 0) {
         return {
           isValid: true,
           brokenLinks: [],
@@ -155,16 +166,20 @@ export class MessageRecoveryService {
 
       const brokenLinks: string[] = [];
       let totalBackups = 0;
-      let currentBlobId: string | null = latestBlobId;
 
-      while (currentBlobId) {
+      for (const blobObject of blobObjects) {
         try {
-          const backupData = await this.walrusService.downloadBackup(currentBlobId);
-          totalBackups++;
-          currentBlobId = backupData.previousBlobId;
+          const blobId = this.extractBlobIdFromObject(blobObject);
+          if (blobId) {
+            const backupData = await this.walrusService.downloadBackup(blobId);
+            
+            // Only verify PenguinChat backups
+            if (this.isPenguinChatBackup(backupData)) {
+              totalBackups++;
+            }
+          }
         } catch (error) {
-          brokenLinks.push(currentBlobId);
-          break;
+          brokenLinks.push(blobObject.objectId);
         }
       }
 
@@ -177,6 +192,44 @@ export class MessageRecoveryService {
     } catch (error) {
       console.error('Failed to verify backup chain:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Check if a backup is a valid PenguinChat backup
+   */
+  private isPenguinChatBackup(backupData: any): boolean {
+    try {
+      // Check if it has the required PenguinChat identifiers
+      return (
+        backupData &&
+        typeof backupData === 'object' &&
+        backupData.appId === 'penguinchat' &&
+        backupData.version &&
+        backupData.conversations &&
+        typeof backupData.conversations === 'object' &&
+        typeof backupData.timestamp === 'number'
+      );
+    } catch (error) {
+      console.error('Error validating backup data:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Extract blob ID from Sui object
+   */
+  private extractBlobIdFromObject(blobObject: SuiBlobObject): string | null {
+    try {
+      // The blob ID is typically stored in the object's data fields
+      // This might need adjustment based on the actual structure
+      if (blobObject.data && blobObject.data.fields) {
+        return blobObject.data.fields.blob_id || blobObject.objectId;
+      }
+      return blobObject.objectId;
+    } catch (error) {
+      console.error('Failed to extract blob ID from object:', error);
+      return null;
     }
   }
 }

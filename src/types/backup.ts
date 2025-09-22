@@ -1,7 +1,9 @@
 export interface BackupData {
   timestamp: number;
-  previousBlobId: string | null;
+  appId: string; // "penguinchat" - to identify our backups
+  version: string; // "1.0.0" - for future compatibility
   conversations: Record<string, Message[]>;
+  suiObjectId?: string; // Optional: store the Sui object ID for reference
 }
 
 export interface Message {
@@ -44,11 +46,25 @@ export interface WalrusUploadResult {
   };
 }
 
-export interface UserBackupRecord {
-  user_address: string;
-  latest_blob_id: string;
-  last_backup_timestamp: number;
-  backup_frequency_minutes: number;
-  created_at: string;
-  updated_at: string;
+export interface SuiBlobObject {
+  objectId: string;
+  version: string;
+  digest: string;
+  type: string;
+  owner: {
+    AddressOwner: string;
+  };
+  previousTransaction: string;
+  storageRebate: string;
+  reference: {
+    objectId: string;
+    version: string;
+    digest: string;
+  };
+  data: {
+    dataType: string;
+    type: string;
+    has_public_transfer: boolean;
+    fields: any;
+  };
 }
