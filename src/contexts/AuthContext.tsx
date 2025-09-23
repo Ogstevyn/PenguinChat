@@ -2,10 +2,10 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useCurrentAccount, useDisconnectWallet } from '@mysten/dapp-kit';
 
 interface User {
-  id: string;        // wallet address
-  name: string;      // friendly display (wallet short form)
+  id: string;
+  name: string;
   email?: string;
-  avatar?: string;   // optional custom avatar
+  avatar?: string;
 }
 
 interface AuthContextType {
@@ -29,7 +29,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Sync user with wallet connection
   useEffect(() => {
     if (currentAccount) {
       const address = currentAccount.address;

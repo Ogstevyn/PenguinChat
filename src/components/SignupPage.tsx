@@ -53,10 +53,7 @@ const SignupPage: React.FC = () => {
 
   return (
     <div className="min-h-screen max-w-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/10">
-      {/* Interactive 3D Background */}
       <InteractiveBackground />
-
-      {/* Theme Toggle */}
       <motion.div
         className="absolute top-6 right-6 z-20"
         initial={{ opacity: 0, scale: 0.8 }}
@@ -182,7 +179,6 @@ const SignupPage: React.FC = () => {
             </p>
           </motion.div>
 
-          {/* Floating particles */}
           <div className="absolute inset-0 pointer-events-none">
             {[...Array(6)].map((_, i) => (
               <motion.div

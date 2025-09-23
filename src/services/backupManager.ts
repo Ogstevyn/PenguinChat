@@ -1,17 +1,14 @@
 import { WalrusService } from './walrusService';
-import { SupabaseService } from './supabaseService';
 import { LocalStorageService } from './localStorageService';
 import { BackupData, Message } from '../types/backup';
 
 export class BackupManager {
   private walrusService: WalrusService;
-  private supabaseService: SupabaseService;
   private backupInterval: NodeJS.Timeout | null = null;
   private isBackingUp: boolean = false;
 
   constructor(privateKey: string) {
     this.walrusService = new WalrusService(privateKey);
-    this.supabaseService = new SupabaseService();
   }
 
   /**
@@ -66,29 +63,24 @@ export class BackupManager {
 
       console.log(`Backing up ${pendingMessages.length} messages for ${userAddress}`);
 
-      // 2. Get latest blob ID from Supabase
-      const latestBlobId = await this.supabaseService.getLatestBlobId(userAddress);
-
-      // 3. Group messages by chatId
+      // 2. Group messages by chatId
       const conversations = this.groupMessagesByChat(pendingMessages);
 
-      // 4. Create backup data
+      // 3. Create backup data with PenguinChat identifiers
       const backupData: BackupData = {
         timestamp: Date.now(),
-        previousBlobId: latestBlobId,
+        appId: "penguinchat", // Identify as PenguinChat backup
+        version: "1.0.0",     // Version for compatibility
         conversations
       };
 
-      // 5. Upload to Walrus
+      // 4. Upload to Walrus
       const newBlobId = await this.walrusService.uploadBackup(backupData);
 
-      // 6. Update Supabase with new blob ID
-      await this.supabaseService.updateLatestBlobId(userAddress, newBlobId);
-
-      // 7. Clear localStorage
+      // 5. Clear localStorage
       LocalStorageService.clearPendingMessages();
 
-      // 8. Update last backup timestamp
+      // 6. Update last backup timestamp
       LocalStorageService.updateLastBackupTimestamp(Date.now());
 
       console.log(`Backup successful for ${userAddress}: ${newBlobId}`);
@@ -132,20 +124,22 @@ export class BackupManager {
    */
   async getBackupStatus(userAddress: string): Promise<{
     hasBackups: boolean;
-    latestBlobId: string | null;
     pendingMessageCount: number;
     lastBackupTimestamp: number | null;
+    totalBackups: number;
   }> {
     try {
-      const latestBlobId = await this.supabaseService.getLatestBlobId(userAddress);
       const pendingMessageCount = LocalStorageService.getPendingMessageCount();
       const settings = LocalStorageService.getBackupSettings();
       
+      // Get user's blob objects to check if they have backups
+      const blobObjects = await this.walrusService.getUserBlobObjects(userAddress);
+      
       return {
-        hasBackups: latestBlobId !== null,
-        latestBlobId,
+        hasBackups: blobObjects.length > 0,
         pendingMessageCount,
-        lastBackupTimestamp: settings.lastBackupTimestamp || null
+        lastBackupTimestamp: settings.lastBackupTimestamp || null,
+        totalBackups: blobObjects.length
       };
     } catch (error) {
       console.error('Failed to get backup status:', error);
@@ -158,9 +152,6 @@ export class BackupManager {
    */
   async updateBackupFrequency(userAddress: string, frequencyMinutes: number): Promise<void> {
     try {
-      // Update in Supabase
-      await this.supabaseService.updateBackupFrequency(userAddress, frequencyMinutes);
-      
       // Update in localStorage
       const settings = LocalStorageService.getBackupSettings();
       settings.frequencyMinutes = frequencyMinutes;
@@ -181,9 +172,6 @@ export class BackupManager {
    */
   async initializeUser(userAddress: string, frequencyMinutes: number = 5): Promise<void> {
     try {
-      // Create initial backup record in Supabase
-      await this.supabaseService.createUserBackupRecord(userAddress, frequencyMinutes);
-      
       // Set up localStorage settings
       LocalStorageService.saveBackupSettings({
         frequencyMinutes,

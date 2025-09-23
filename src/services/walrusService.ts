@@ -1,4 +1,4 @@
-import { BackupData } from '../types/backup';
+import { BackupData, SuiBlobObject } from '../types/backup';
 
 const BACKEND_URL = 'http://localhost:3002';
 
@@ -16,8 +16,9 @@ export class WalrusService {
       const messageCount = Object.values(backupData.conversations).reduce((sum, msgs) => sum + msgs.length, 0);
       
       console.log('🔄 Uploading backup via API:', {
+        appId: backupData.appId,
+        version: backupData.version,
         messageCount,
-        previousBlobId: backupData.previousBlobId,
         timestamp: backupData.timestamp,
         conversations: Object.keys(backupData.conversations)
       });
@@ -62,6 +63,54 @@ export class WalrusService {
       return result.backupData;
     } catch (error) {
       console.error('Failed to download backup via API:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all blob objects for a user from their wallet
+   */
+  async getUserBlobObjects(userAddress: string): Promise<SuiBlobObject[]> {
+    try {
+      console.log('🔍 Querying wallet for blob objects:', userAddress);
+      
+      const response = await fetch(`${BACKEND_URL}/api/user-blobs/${userAddress}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to get user blob objects');
+      }
+
+      const result = await response.json();
+      
+      console.log('✅ Retrieved blob objects:', result.objects.length);
+      return result.objects;
+    } catch (error) {
+      console.error('Failed to get user blob objects:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get only PenguinChat backup objects for a user
+   */
+  async getPenguinChatBackups(userAddress: string): Promise<any[]> {
+    try {
+      console.log('🔍 Querying wallet for PenguinChat backups:', userAddress);
+      
+      const response = await fetch(`${BACKEND_URL}/api/penguinchat-backups/${userAddress}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to get PenguinChat backups');
+      }
+
+      const result = await response.json();
+      
+      console.log(`✅ Retrieved ${result.total} PenguinChat backups out of ${result.totalBlobs} total blob objects`);
+      return result.backups;
+    } catch (error) {
+      console.error('Failed to get PenguinChat backups:', error);
       throw error;
     }
   }
