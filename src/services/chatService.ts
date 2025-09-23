@@ -1,4 +1,4 @@
-import { Message, BackupData } from '../types/backup';
+import { Message } from '../types/backup';
 import { MessageRecoveryService } from './messageRecoveryService';
 import { LocalStorageService } from './localStorageService';
 
@@ -14,6 +14,7 @@ export interface ChatSummary {
 
 export class ChatService {
   private recoveryService: MessageRecoveryService;
+  private messageUpdateCallbacks: ((messages: Message[]) => void)[] = [];
 
   constructor(privateKey: string) {
     this.recoveryService = new MessageRecoveryService(privateKey);
@@ -21,82 +22,89 @@ export class ChatService {
 
   async getUserChats(userAddress: string): Promise<ChatSummary[]> {
     try {
-      console.log('🔍 Loading user chats from backup system...');
-      
-      // Get all messages from backup system
-      const allMessages = await this.recoveryService.recoverUserMessages(userAddress);
-      
-      // Get pending messages from localStorage
       const pendingMessages = LocalStorageService.getPendingMessages();
       
-      // Combine all messages
-      const combinedMessages = [...allMessages, ...pendingMessages];
+      this.recoveryService.recoverUserMessagesStream(userAddress, (newMessages) => {
+        newMessages.forEach(message => {
+          LocalStorageService.saveMessage(message);
+        });
+        this.notifyMessagesUpdated(newMessages);
+      });
       
-      if (combinedMessages.length === 0) {
-        console.log('No messages found, returning empty chat list');
+      if (pendingMessages.length === 0) {
         return [];
       }
-
-      // Group messages by chatId
-      const messagesByChat = this.groupMessagesByChat(combinedMessages);
+  
+      const messagesByChat = this.groupMessagesByChat(pendingMessages);
       
-      // Create chat summaries
-      const chats: ChatSummary[] = Object.entries(messagesByChat).map(([chatId, messages]) => {
-        // Sort messages by timestamp to get the latest
+      const chatSummaries: ChatSummary[] = Object.entries(messagesByChat).map(([chatId, messages]) => {
         const sortedMessages = messages.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
         const lastMessage = sortedMessages[0];
         
-        // Count unread messages (messages not sent by current user and not read)
-        const unreadCount = messages.filter(msg => 
-          !msg.isSent && !msg.isRead
-        ).length;
-
         return {
           id: chatId,
           name: this.getChatName(chatId, messages),
           avatar: this.getChatAvatar(chatId, messages),
           lastMessage: lastMessage.text,
           timestamp: this.formatTimestamp(lastMessage.timestamp),
-          unreadCount: unreadCount > 0 ? unreadCount : undefined,
-          lastMessageTimestamp: lastMessage.timestamp
+          lastMessageTimestamp: lastMessage.timestamp,
+          unreadCount: 0
         };
       });
-
-      // Sort chats by last message timestamp
-      chats.sort((a, b) => b.lastMessageTimestamp.getTime() - a.lastMessageTimestamp.getTime());
-
-      console.log(`✅ Loaded ${chats.length} chats from backup system`);
-      return chats;
-
+  
+      chatSummaries.sort((a, b) => b.lastMessageTimestamp.getTime() - a.lastMessageTimestamp.getTime());
+      return chatSummaries;
+      
     } catch (error) {
       console.error('Failed to load user chats:', error);
-      // Return empty array on error
       return [];
     }
   }
 
   async getChatMessages(userAddress: string, chatId: string): Promise<Message[]> {
     try {
-      console.log(`🔍 Loading messages for chat ${chatId}...`);
-      
-      // Get all messages from backup system
       const allMessages = await this.recoveryService.recoverUserMessages(userAddress);
-      
-      // Get pending messages from localStorage
       const pendingMessages = LocalStorageService.getPendingMessages();
       
-      // Combine and filter by chatId
       const chatMessages = [...allMessages, ...pendingMessages]
         .filter(msg => msg.chatId === chatId)
         .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
-      console.log(`✅ Loaded ${chatMessages.length} messages for chat ${chatId}`);
       return chatMessages;
-
     } catch (error) {
       console.error(`Failed to load messages for chat ${chatId}:`, error);
       return [];
     }
+  }
+
+  async createNewChat(userAddress: string, chatId: string, chatName: string, chatAvatar: string): Promise<void> {
+    try {
+      const welcomeMessage: Message = {
+        id: Date.now().toString(),
+        text: `Started conversation with ${chatName}`,
+        timestamp: new Date(),
+        isSent: true,
+        isRead: true,
+        chatId,
+        sender: {
+          name: 'You',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=You&backgroundColor=b6e3f4&radius=50'
+        }
+      };
+
+      LocalStorageService.saveMessage(welcomeMessage);
+    } catch (error) {
+      console.error('Failed to create new chat:', error);
+      throw error;
+    }
+  }
+
+  onMessagesUpdated(callback: (messages: Message[]) => void) {
+    this.messageUpdateCallbacks.push(callback);
+  }
+
+  private notifyMessagesUpdated(messages: Message[]) {
+    this.messageUpdateCallbacks.forEach(callback => callback(messages));
   }
 
   private groupMessagesByChat(messages: Message[]): Record<string, Message[]> {
@@ -110,34 +118,31 @@ export class ChatService {
     }, {} as Record<string, Message[]>);
   }
 
-    private getChatName(chatId: string, messages: Message[]): string {
-        
-        const nonUserMessage = messages.find(msg => !msg.isSent);
-        if (nonUserMessage) {
-        return nonUserMessage.sender.name;
-        }
-        
-        const welcomeMessage = messages.find(msg => 
-        msg.isSent && msg.text.includes('Started conversation with')
-        );
-        if (welcomeMessage) {
-        const match = welcomeMessage.text.match(/Started conversation with (.+)/);
-        if (match) {
-            return match[1];
-        }
-        }
-        
-        const parts = chatId.split('_');
-        if (parts.length >= 3) {
-        const userAddress = parts[2];
-        return userAddress;
-        }
-        
-        return chatId;
+  private getChatName(chatId: string, messages: Message[]): string {
+    const nonUserMessage = messages.find(msg => !msg.isSent);
+    if (nonUserMessage) {
+      return nonUserMessage.sender.name;
     }
+    
+    const welcomeMessage = messages.find(msg => 
+      msg.isSent && msg.text.includes('Started conversation with')
+    );
+    if (welcomeMessage) {
+      const match = welcomeMessage.text.match(/Started conversation with (.+)/);
+      if (match) {
+        return match[1];
+      }
+    }
+    
+    const parts = chatId.split('_');
+    if (parts.length >= 3) {
+      return parts[2];
+    }
+    
+    return chatId;
+  }
 
   private getChatAvatar(chatId: string, messages: Message[]): string {
-    // Try to find an avatar from the first non-user message
     const nonUserMessage = messages.find(msg => !msg.isSent);
     if (nonUserMessage) {
       return nonUserMessage.sender.avatar;
@@ -166,29 +171,4 @@ export class ChatService {
     
     return timestamp.toLocaleDateString();
   }
-  
-    async createNewChat(userAddress: string, chatId: string, chatName: string, chatAvatar: string): Promise<void> {
-        try {
-        const welcomeMessage: Message = {
-            id: Date.now().toString(),
-            text: `Started conversation with ${chatName}`,
-            timestamp: new Date(),
-            isSent: true,
-            isRead: true,
-            chatId,
-            sender: {
-            name: 'You',
-            avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=You&backgroundColor=b6e3f4&radius=50'
-            }
-        };
-    
-        // Save to localStorage (will be backed up later)
-        LocalStorageService.saveMessage(welcomeMessage);
-        
-        console.log(`✅ Created new chat: ${chatName} (${chatId})`);
-        } catch (error) {
-        console.error('Failed to create new chat:', error);
-        throw error;
-        }
-    }
 }

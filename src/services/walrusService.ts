@@ -1,143 +1,226 @@
 import { BackupData, SuiBlobObject } from '../types/backup';
-
-const BACKEND_URL = 'http://localhost:3002';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import walrusWasmUrl from '@mysten/walrus-wasm/web/walrus_wasm_bg.wasm?url';
+import { WalrusClient, RetryableWalrusClientError } from "@mysten/walrus";
+import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 
 export class WalrusService {
-  private keypair: any;
+  private client: SuiClient;
+  private keypair: Ed25519Keypair;
+  private walrusClient: WalrusClient;
+  private penguinChat: any[];
 
   constructor(privateKey: string) {
-    // Just store the private key for reference
-    this.keypair = { privateKey };
-    console.log('WalrusService initialized - using backend API');
+    this.client = new SuiClient({ url: getFullnodeUrl('testnet') });
+    this.keypair = Ed25519Keypair.fromSecretKey(privateKey);
+    this.walrusClient = new WalrusClient({ 
+      network: "testnet", 
+      wasmUrl: walrusWasmUrl, 
+      suiClient: this.client,
+      storageNodeClientOptions: {
+        timeout: 60_000,
+      },
+    });
+    this.penguinChat = [];
   }
 
-  async uploadBackup(backupData: BackupData, retries: number = 3): Promise<string> {
+  async uploadBackup(backupData: BackupData): Promise<string> {
+    return '';
     try {
-      const messageCount = Object.values(backupData.conversations).reduce((sum, msgs) => sum + msgs.length, 0);
+      const data = JSON.stringify(backupData);
+      const dataBytes = new TextEncoder().encode(data);
+      const userAddress = useCurrentAccount();
+      const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+
+      // Step 1: Encode the blob
+      const encoded = await this.walrusClient.encodeBlob(dataBytes);
+      console.log('Encoded blob:', encoded);
+
+      // Step 2: Check account balance
+      const balance = await this.client.getBalance({ owner: userAddress.address });
+      console.log('Account Balance:', balance.totalBalance);
+
+      // Step 3: Register blob transaction
+      const registerBlobTransaction = await this.walrusClient.registerBlobTransaction({
+        blobId: encoded.blobId,
+        rootHash: encoded.rootHash,
+        size: dataBytes.byteLength,
+        deletable: true,
+        epochs: 3,
+        owner: userAddress.address,
+      });
       
-      console.log('🔄 Uploading backup via API:', {
-        appId: backupData.appId,
-        version: backupData.version,
-        messageCount,
-        timestamp: backupData.timestamp,
-        conversations: Object.keys(backupData.conversations)
-      });
+      registerBlobTransaction.setSender(userAddress.address);
+      registerBlobTransaction.setGasBudget(1000000000);
 
-      const response = await fetch(`${BACKEND_URL}/api/backup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Step 4: Execute register transaction
+      
+      const { digest } = await signAndExecute({
+        // @ts-ignore
+        transaction: registerBlobTransaction,
+        options: {
+          showEffects: true,
+          showObjectChanges: true,
         },
-        body: JSON.stringify({ backupData }),
+      });
+      //const { digest } = await this.client.signAndExecuteTransaction({ transaction: registerBlobTransaction, signer: userAddress });
+      console.log('Register transaction digest:', digest);
+
+      // Step 5: Wait for transaction and get object changes
+      const { objectChanges, effects } = await this.client.waitForTransaction({
+        digest,
+        options: { showObjectChanges: true, showEffects: true },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Backup upload failed');
+      if (effects?.status.status !== 'success') {
+        throw new Error('Failed to register blob');
       }
 
-      const result = await response.json();
-      
-      console.log('✅ Backup uploaded successfully via API:', result.blobId);
-      return result.blobId;
+      // Step 6: Find the created blob object
+      const blobType = await this.walrusClient.getBlobType();
+      const blobObject = objectChanges?.find(
+        (change) => change.type === 'created' && change.objectType === blobType,
+      ) as any;
+
+      if (!blobObject || blobObject.type !== 'created') {
+        throw new Error('Blob object not found');
+      }
+
+      // Step 7: Write encoded blob to nodes
+      const confirmations = await this.walrusClient.writeEncodedBlobToNodes({
+        blobId: encoded.blobId,
+        metadata: encoded.metadata,
+        sliversByNode: encoded.sliversByNode,
+        deletable: true,
+        objectId: blobObject.objectId,
+      });
+
+      // Step 8: Certify blob transaction
+      const certifyBlobTransaction = await this.walrusClient.certifyBlobTransaction({
+        blobId: encoded.blobId,
+        blobObjectId: blobObject.objectId,
+        confirmations,
+        deletable: true,
+      });
+      certifyBlobTransaction.setSender(userAddress.address);
+
+      // Step 9: Execute certify transaction
+      const { digest: certifyDigest } = await signAndExecute({
+        // @ts-ignore
+        transaction: certifyBlobTransaction,
+      });
+
+      // Step 10: Wait for certification
+      const { effects: certifyEffects } = await this.client.waitForTransaction({
+        digest: certifyDigest,
+        options: { showEffects: true },
+      });
+
+      if (certifyEffects?.status.status !== 'success') {
+        throw new Error('Failed to certify blob');
+      }
+
+      console.log('Backup uploaded successfully with blob ID:', encoded.blobId);
+      return encoded.blobId;
     } catch (error) {
-      console.error('Failed to upload backup via API:', error);
+      console.error('Failed to upload backup to blockchain:', error);
       throw error;
     }
   }
 
   async downloadBackup(blobId: string): Promise<BackupData> {
     try {
-      console.log('📥 Downloading backup via API:', blobId);
-      
-      const response = await fetch(`${BACKEND_URL}/api/backup/${blobId}`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Backup download failed');
-      }
-
-      const result = await response.json();
-      
-      console.log('✅ Backup downloaded successfully via API');
-      return result.backupData;
-    } catch (error) {
-      console.error('Failed to download backup via API:', error);
-      throw error;
+      // For now, return null since we'll use getUserBlobObjects instead
+      return null;
+    } catch {
+      return null;
     }
   }
-
-  /**
-   * Get all blob objects for a user from their wallet
-   */
+  
   async getUserBlobObjects(userAddress: string): Promise<SuiBlobObject[]> {
     try {
-      console.log('🔍 Querying wallet for blob objects:', userAddress);
+      // Use the lite-server API instead of direct blockchain calls
+      const response = await fetch(`http://localhost:3002/api/penguinchat-backups/${userAddress}`);
       
-      const response = await fetch(`${BACKEND_URL}/api/user-blobs/${userAddress}`);
-
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to get user blob objects');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-
-      const result = await response.json();
       
-      console.log('✅ Retrieved blob objects:', result.objects.length);
-      return result.objects;
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch backups');
+      }
+      
+      // Convert the API response to the expected format
+      return data.backups.map((backup: any) => ({
+        objectId: backup.objectId,
+        version: '1',
+        digest: '',
+        type: 'blob',
+        owner: {
+          AddressOwner: userAddress,
+        },
+        previousTransaction: '',
+        storageRebate: '',
+        reference: {
+          objectId: backup.objectId,
+          version: '1',
+          digest: '',
+        },
+        data: {
+          dataType: 'moveObject',
+          type: 'blob',
+          has_public_transfer: false,
+          fields: {
+            blob_id: backup.blobId,
+          },
+        },
+      }));
     } catch (error) {
-      console.error('Failed to get user blob objects:', error);
+      console.error('Failed to get user blob objects from API:', error);
       throw error;
     }
   }
-
-  /**
-   * Get only PenguinChat backup objects for a user
-   */
+  
   async getPenguinChatBackups(userAddress: string): Promise<any[]> {
     try {
-      console.log('🔍 Querying wallet for PenguinChat backups:', userAddress);
+      // Use the lite-server API directly
+      const response = await fetch(`http://localhost:3002/api/penguinchat-backups/${userAddress}`);
       
-      const response = await fetch(`${BACKEND_URL}/api/penguinchat-backups/${userAddress}`);
-
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to get PenguinChat backups');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-
-      const result = await response.json();
       
-      console.log(`✅ Retrieved ${result.total} PenguinChat backups out of ${result.totalBlobs} total blob objects`);
-      return result.backups;
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch backups');
+      }
+      
+      // Return the backups with blobId for downloadBackup calls
+      return data.backups.map((backup: any) => ({
+        blobId: backup.blobId,
+        backupData: null, // Will be fetched separately if needed
+        timestamp: backup.timestamp,
+        messageCount: backup.messageCount,
+      }));
     } catch (error) {
-      console.error('Failed to get PenguinChat backups:', error);
+      console.error('Failed to get PenguinChat backups from API:', error);
       throw error;
     }
   }
 
-  async getBackupMetadata(blobId: string): Promise<any> {
-    return {
-      blobId,
-      timestamp: Date.now()
-    };
-  }
-
-  async blobExists(blobId: string): Promise<boolean> {
-    try {
-      await this.downloadBackup(blobId);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  async getBlobSize(blobId: string): Promise<number> {
-    try {
-      const backupData = await this.downloadBackup(blobId);
-      return JSON.stringify(backupData).length;
-    } catch (error) {
-      console.error('Failed to get blob size:', error);
-      throw error;
-    }
+  private isPenguinChatBackup(backupData: any): boolean {
+    return (
+      backupData &&
+      typeof backupData === 'object' &&
+      backupData.appId === 'penguinchat' &&
+      backupData.version &&
+      backupData.conversations &&
+      typeof backupData.conversations === 'object' &&
+      typeof backupData.timestamp === 'number'
+    );
   }
 }

@@ -20,7 +20,6 @@ export class LocalStorageService {
       if (!messagesJson) return [];
       
       const messages = JSON.parse(messagesJson);
-      // Convert timestamp strings back to Date objects
       return messages.map((msg: any) => ({
         ...msg,
         timestamp: new Date(msg.timestamp)
@@ -30,7 +29,6 @@ export class LocalStorageService {
       return [];
     }
   }
-
 
   static clearPendingMessages(): void {
     try {
@@ -44,22 +42,6 @@ export class LocalStorageService {
     return this.getPendingMessages().length;
   }
 
-  /**
-   * Group pending messages by chatId
-   */
-  static groupMessagesByChat(): Record<string, Message[]> {
-    const messages = this.getPendingMessages();
-    return messages.reduce((groups, message) => {
-      const chatId = message.chatId;
-      if (!groups[chatId]) {
-        groups[chatId] = [];
-      }
-      groups[chatId].push(message);
-      return groups;
-    }, {} as Record<string, Message[]>);
-  }
-
-
   static saveBackupSettings(settings: BackupSettings): void {
     try {
       localStorage.setItem(this.BACKUP_SETTINGS_KEY, JSON.stringify(settings));
@@ -67,7 +49,6 @@ export class LocalStorageService {
       console.error('Failed to save backup settings to localStorage:', error);
     }
   }
-
 
   static getBackupSettings(): BackupSettings {
     try {
@@ -88,9 +69,6 @@ export class LocalStorageService {
     }
   }
 
-  /**
-   * Update last backup timestamp
-   */
   static updateLastBackupTimestamp(timestamp: number): void {
     try {
       const settings = this.getBackupSettings();
@@ -101,13 +79,10 @@ export class LocalStorageService {
     }
   }
 
-  /**
-   * Check if backup is due based on frequency
-   */
   static isBackupDue(): boolean {
     const settings = this.getBackupSettings();
     if (!settings.autoBackup || !settings.lastBackupTimestamp) {
-      return true; // First backup or auto backup disabled
+      return true;
     }
     
     const now = Date.now();
