@@ -9,7 +9,41 @@ import ChatInterface from './ChatInterface';
 import { isValidSuiAddress } from '@mysten/sui/utils';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { CloudUpload, Settings } from 'lucide-react';
-import { ChatSummary } from '../services/chatService';
+import { BackupSettings } from './BackupSettings';
+
+type ChatSummary = {
+  id: string;
+  name: string;
+  avatar: string;
+  lastMessage: string;
+  timestamp: string;
+  unreadCount?: number;
+};
+
+const sampleChats: ChatSummary[] = [
+  {
+    id: '1',
+    name: 'Sarah Chen',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede&radius=50',
+    lastMessage: 'See you at 5 PM!',
+    timestamp: '2m ago',
+    unreadCount: 2,
+  },
+  {
+    id: '2',
+    name: 'Dev Team',
+    avatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=DevTeam',
+    lastMessage: 'Build passed ✔️',
+    timestamp: '1h ago',
+  },
+  {
+    id: '3',
+    name: 'Penguin Bot',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=PenguinBot&backgroundColor=b6e3f4&radius=50',
+    lastMessage: 'Welcome to PenguinChat!',
+    timestamp: 'Yesterday',
+  },
+];
 
 const ChatListPage: React.FC = () => {
   const [activeChat, setActiveChat] = useState<string | null>(null);
@@ -222,12 +256,14 @@ const ChatListPage: React.FC = () => {
         </div>
         <div className="flex-1 px-6 overflow-y-auto">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center py-8">
+            {/* Import BackupSettings component here */}
+            <BackupSettings/>
+            {/* <div className="text-center py-8">
               <p className="text-muted-foreground">Backup settings component will be rendered here</p>
               <p className="text-sm text-muted-foreground mt-2">
                 Pending messages: {pendingMessageCount}
               </p>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

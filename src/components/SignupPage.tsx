@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useTheme } from "@/contexts/ThemeContext";
 import InteractiveBackground from "./InteractiveBackground";
 import ThemeToggle from "./ThemeToggle";
+import penguinchatlogo from "@/assets/penguinchatlogo.png"
 
 import {
   useConnectWallet,
@@ -85,7 +86,7 @@ const SignupPage: React.FC = () => {
               transition={{ delay: 0.4, duration: 1, ease: "easeOut" }}
             >
               <motion.div
-                className="relative inline-block px-8 py-4 bg-gradient-to-r from-primary/10 to-accent/10 rounded-3xl backdrop-blur-sm border border-primary/10"
+                className="relative flex justify-center items-center px-8 py-4 bg-gradient-to-r from-primary/10 to-accent/10 rounded-3xl backdrop-blur-sm border border-primary/10"
                 animate={{
                   scale: [1, 1.02, 1],
                 }}
@@ -101,6 +102,7 @@ const SignupPage: React.FC = () => {
                       : "0 0 10px rgba(26, 26, 26, 0.2)",
                 }}
               >
+                <img src={penguinchatlogo} alt="penguinchatlogo" className="w-20" />
                 <motion.h1
                   className="text-5xl font-bold text-primary font-mono mb-2"
                   style={{
