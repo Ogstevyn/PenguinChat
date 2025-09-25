@@ -261,7 +261,7 @@ app.get('/api/penguinchat-backups/:userAddress', async (req, res) => {
   }
 });
 
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     walrusInitialized: !!walrusClient,
