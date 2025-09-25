@@ -35,7 +35,41 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAva
     scrollToBottom();
   }, [messages]);
 
-  // Load messages when component mounts or chatId changes
+  useEffect(() => {
+    if (!chatService || !user?.id) return;
+
+    const handleNewMessage = (message: Message) => {
+      console.log(`📨 ChatInterface received new message:`, message);
+      
+      // Only add the message if it belongs to the current chat
+      if (message.chatId === chatId) {
+        console.log(`✅ Message belongs to current chat, adding to UI`);
+        setMessages(prev => {
+          // Check if message already exists to prevent duplicates
+          const exists = prev.some(m => m.id === message.id);
+          if (exists) {
+            console.log(`⚠️ Message already exists, skipping`);
+            return prev;
+          }
+          
+          const updated = [...prev, message];
+          console.log(`📝 Updated messages count: ${updated.length}`);
+          return updated;
+        });
+      } else {
+        console.log(`⏭️ Message doesn't belong to current chat: ${message.chatId} vs ${chatId}`);
+      }
+    };
+
+    // Subscribe to message callbacks
+    chatService.onMessage(handleNewMessage);
+    
+    // Cleanup subscription on unmount
+    return () => {
+      chatService.offMessage(handleNewMessage);
+    };
+  }, [chatService, user?.id, chatId]);
+
   useEffect(() => {
     const loadMessages = async () => {
       if (!chatService || !user?.id) {
@@ -58,25 +92,51 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAva
     loadMessages();
   }, [chatService, user?.id, chatId]);
 
-  const handleSendMessage = async (text: string) => {
+  const getRecipientInfo = () => {
+    const parts = chatId.split('_');
+    const address1 = parts[1];
+    const address2 = parts[2];
+    const recipientAddress = user?.id === address1 ? address2 : address1;
+    return {
+      address: recipientAddress,
+      name: chatName
+    };
+  };
+
+
+  const recipientInfo = getRecipientInfo();
+
+  const handleSendMessage = async (message: Message) => {
     const newMessage: Message = {
-      id: Date.now().toString(),
-      text,
+      ...message,
+      id: `${Date.now()}_${Math.random()}`,
+      text: message.text,
       timestamp: new Date(),
       isSent: true,
       isRead: false,
-      chatId,
+      status: 'sending',
+      chatId, // Use the same chatId, don't change it
       sender: currentUser,
     };
-
+  
+    // Update UI immediately
     setMessages((prev) => [...prev, newMessage]);
-    setIsTyping(true);
-
-    // Simulate typing delay (you can remove this if you want instant responses)
-    setTimeout(() => {
-      setIsTyping(false);
-      // No demo responses - just stop typing
-    }, 1500 + Math.random() * 2000);
+  
+    try {
+      // Send via chat service
+      await chatService.sendMessage(user.id, newMessage);
+      
+      // Update status to sent
+      setMessages((prev) => prev.map(m => 
+        m.id === newMessage.id ? { ...m, status: 'sent' } : m
+      ));
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      // Update status to failed
+      setMessages((prev) => prev.map(m => 
+        m.id === newMessage.id ? { ...m, status: 'failed' } : m
+      ));
+    }
   };
 
   return (
@@ -143,7 +203,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAva
         )}
       </div>
 
-      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
+      <ChatInput
+        onSendMessage={handleSendMessage}
+        disabled={isLoadingMessages}
+        recipientAddress={recipientInfo.address}
+        recipientName={recipientInfo.name}
+        chatId={chatId}
+      />
     </div>
   );
 };

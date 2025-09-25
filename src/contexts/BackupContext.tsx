@@ -41,46 +41,59 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
   const [pendingMessageCount, setPendingMessageCount] = useState(0);
   const [lastBackupTimestamp, setLastBackupTimestamp] = useState<number | null>(null);
 
-  // Initialize backup system when user is available
+
   useEffect(() => {
-    if (user && user.id) {
+    if (user?.id) {
+      console.log('🔄 User switched to:', user.id, user.name);
+      
+      if (chatService) {
+        chatService.disconnect();
+      }
+      
+      console.log('🚀 Initializing services for new user:', user.id);
       initializeBackupSystem();
     } else {
+      console.log('👋 User disconnected, cleaning up');
       cleanupBackupSystem();
     }
-  }, [user]);
+  }, [user?.id]);
 
-  // Update pending message count periodically
   useEffect(() => {
     const interval = setInterval(() => {
-      setPendingMessageCount(LocalStorageService.getPendingMessageCount());
-      const settings = LocalStorageService.getBackupSettings();
-      setLastBackupTimestamp(settings.lastBackupTimestamp || null);
+      if (user?.id) {
+        setPendingMessageCount(LocalStorageService.getAllMessages(user.id).length);
+        const settings = LocalStorageService.getBackupSettings(user.id);
+        setLastBackupTimestamp(settings.lastBackupTimestamp || null);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const initializeBackupSystem = async () => {
+    if (!user?.id) return;
+    
     try {
-      if (!user?.id) return;
-
+      console.log('🔧 Initializing backup system for user:', user.id);
+      
       const dummyPrivateKey = "suiprivkey1qpqywg8f9kdhcfs3j23l0g0ejljxdawmxkjyypfs58ggzuj5j5hhxy7gaex";
       
       const manager = new BackupManager(dummyPrivateKey);
       const recovery = new MessageRecoveryService(dummyPrivateKey);
-      const chat = new ChatService(dummyPrivateKey); // Add this
-
+      const chat = new ChatService(user.id);
+      
       await manager.initializeUser(user.id, 1);
-
+      await chat.connect();
+      
       setBackupManager(manager);
       setRecoveryService(recovery);
-      setChatService(chat); // Add this
+      setChatService(chat);
       setIsInitialized(true);
-
-      console.log('Backup system initialized for user:', user.id);
+      
+      // Log all messages for this user
+      const allMessages = LocalStorageService.getAllMessages(user.id);
     } catch (error) {
-      console.error('Failed to initialize backup system:', error);
+      console.error('❌ Failed to initialize backup system:', error);
     }
   };
 

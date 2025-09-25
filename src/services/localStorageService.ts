@@ -1,58 +1,381 @@
-import { Message, BackupSettings } from '../types/backup';
+import { Message, BackupSettings, ChatSummary } from '../types/backup';
 
 export class LocalStorageService {
-  private static readonly MESSAGES_KEY = 'pending_messages';
-  private static readonly BACKUP_SETTINGS_KEY = 'backup_settings';
+  // Wallet-specific keys
+  private static getMessagesKey(userAddress: string): string {
+    return `messages_${userAddress}`;
+  }
+  
+  private static getChatsKey(userAddress: string): string {
+    return `chats_${userAddress}`;
+  }
+  
+  private static getLastSyncKey(userAddress: string): string {
+    return `lastSync_${userAddress}`;
+  }
+  
+  private static getBackupSettingsKey(userAddress: string): string {
+    return `backup_settings_${userAddress}`;
+  }
 
-  static saveMessage(message: Message): void {
+  private static updateChatSummary(userAddress: string, message: Message): void {
     try {
-      const existingMessages = this.getPendingMessages();
-      const updatedMessages = [...existingMessages, message];
-      localStorage.setItem(this.MESSAGES_KEY, JSON.stringify(updatedMessages));
+      console.log(`🔍 updateChatSummary called with chatId: ${message.chatId}`);
+      console.log(`🔍 Current user address: ${userAddress}`);
+      
+      if (!message.chatId) {
+        console.log(`⚠️ No chatId found in message, skipping chat summary update`);
+        return;
+      }
+      
+      // Extract participants from chatId (format: chat_address1_address2)
+      const parts = message.chatId.split('_');
+      console.log(`🔍 ChatId parts:`, parts);
+      
+      if (parts.length < 3) {
+        console.log(`⚠️ Invalid chatId format: ${message.chatId}`);
+        return;
+      }
+      
+      const address1 = parts[1];
+      const address2 = parts[2];
+      
+      // Check if we already have a chat with this ID
+      const existingChats = this.getUserChats(userAddress);
+      const existingChat = existingChats.find(c => c.id === message.chatId);
+      
+      let chatSummary: ChatSummary;
+      
+      if (existingChat) {
+        // Update existing chat - preserve name and avatar, only update message info
+        chatSummary = {
+          ...existingChat,
+          lastMessage: message.text,
+          lastMessageTimestamp: message.timestamp,
+          timestamp: this.formatTimestamp(message.timestamp)
+        };
+        console.log(` Updating existing chat, preserving name: ${existingChat.name}`);
+      } else {
+        // New chat - create with participants list
+        const otherParticipantAddress = userAddress === address1 ? address2 : address1;
+        
+        chatSummary = {
+          id: message.chatId,
+          name: this.getDisplayName(otherParticipantAddress), // Use display name
+          avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${otherParticipantAddress}`,
+          lastMessage: message.text,
+          timestamp: this.formatTimestamp(message.timestamp),
+          unreadCount: 0,
+          lastMessageTimestamp: message.timestamp,
+          participants: [userAddress, otherParticipantAddress]
+        };
+        console.log(`🆕 Creating new chat with participants:`, chatSummary.participants);
+      }
+      
+      console.log(`💬 Final chat summary:`, chatSummary);
+      
+      // Save the updated chat summary
+      console.log(`💾 Calling saveChat...`);
+      this.saveChat(userAddress, chatSummary);
+      console.log(`✅ Chat summary updated for ${message.chatId}`);
     } catch (error) {
-      console.error('Failed to save message to localStorage:', error);
+      console.error('❌ Failed to update chat summary:', error);
     }
   }
 
-  static getPendingMessages(): Message[] {
+  static saveUserMapping(userAddress: string, displayName: string): void {
     try {
-      const messagesJson = localStorage.getItem(this.MESSAGES_KEY);
-      if (!messagesJson) return [];
+      const key = `user_mapping_${userAddress}`;
+      localStorage.setItem(key, displayName);
+      console.log(`💾 Saved user mapping: ${userAddress} -> ${displayName}`);
+    } catch (error) {
+      console.error('❌ Failed to save user mapping:', error);
+    }
+  }
+
+  static getUserMapping(userAddress: string): string | null {
+    try {
+      const key = `user_mapping_${userAddress}`;
+      return localStorage.getItem(key);
+    } catch (error) {
+      console.error('❌ Failed to get user mapping:', error);
+      return null;
+    }
+  }
+
+  static getAllUserMappings(): Record<string, string> {
+    try {
+      const mappings: Record<string, string> = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('user_mapping_')) {
+          const address = key.replace('user_mapping_', '');
+          const displayName = localStorage.getItem(key);
+          if (displayName) {
+            mappings[address] = displayName;
+          }
+        }
+      }
+      return mappings;
+    } catch (error) {
+      console.error('❌ Failed to get all user mappings:', error);
+      return {};
+    }
+  }
+
+  static getDisplayName(userAddress: string): string {
+    console.log(`🔍 getDisplayName called for: ${userAddress}`);
+    
+    // First check for saved user mapping
+    const mapping = this.getUserMapping(userAddress);
+    if (mapping) {
+      console.log(`✅ Found mapping: ${userAddress} -> ${mapping}`);
+      return mapping;
+    }
+    
+    // Check if it's already a SUI domain (ends with .sui)
+    if (userAddress.endsWith('.sui')) {
+      console.log(`✅ SUI domain detected: ${userAddress}`);
+      return userAddress;
+    }
+    
+    // Fallback to shortened address
+    const shortAddress = `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
+    console.log(`⚠️ Using fallback short address: ${shortAddress}`);
+    return shortAddress;
+  }
+
+  static saveMessage(userAddress: string, message: Message): void {
+    try {
+      console.log(`🚀 saveMessage called for user: ${userAddress}`, message);
+      
+      const key = this.getMessagesKey(userAddress);
+      console.log(`💾 Saving message to key: ${key}`, message);
+      
+      const existingMessages = this.getAllMessages(userAddress);
+      const updatedMessages = [...existingMessages, message];
+      localStorage.setItem(key, JSON.stringify(updatedMessages));
+      
+      console.log(`✅ Message saved. Total messages for ${userAddress}: ${updatedMessages.length}`);
+      
+      // Update chat summary after saving message
+      console.log(`🔄 Calling updateChatSummary for chatId: ${message.chatId}`);
+      this.updateChatSummary(userAddress, message);
+    } catch (error) {
+      console.error('❌ Failed to save message to localStorage:', error);
+    }
+  }
+
+  static getAllMessages(userAddress: string): Message[] {
+    try {
+      const key = this.getMessagesKey(userAddress);
+      
+      const messagesJson = localStorage.getItem(key);
+      if (!messagesJson) {
+        return [];
+      }
       
       const messages = JSON.parse(messagesJson);
-      return messages.map((msg: any) => ({
+      const formattedMessages = messages.map((msg: any) => ({
         ...msg,
         timestamp: new Date(msg.timestamp)
       }));
+      
+      return formattedMessages;
     } catch (error) {
-      console.error('Failed to get pending messages from localStorage:', error);
+      console.error('❌ Failed to get messages from localStorage:', error);
+      return [];
+    }
+  }
+  
+
+  static generateChatSummaries(userAddress: string): ChatSummary[] {
+    try {
+      const messages = this.getAllMessages(userAddress);
+      const chatMap = new Map<string, ChatSummary>();
+      
+      messages.forEach(message => {
+        if (!message.chatId) return;
+        
+        const chatId = message.chatId;
+        const existingChat = chatMap.get(chatId);
+        
+        if (!existingChat || message.timestamp > existingChat.lastMessageTimestamp) {
+          // Extract recipient address from chatId (format: chat_sender_recipient)
+          const parts = chatId.split('_');
+          const recipientAddress = parts[2];
+          const recipientShort = `${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}`;
+          
+          chatMap.set(chatId, {
+            id: chatId,
+            name: recipientShort,
+            avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${recipientAddress}`,
+            lastMessage: message.text,
+            timestamp: this.formatTimestamp(message.timestamp),
+            unreadCount: 0,
+            lastMessageTimestamp: message.timestamp,
+            participants: [userAddress, recipientAddress]
+          });
+        }
+      });
+      
+      const chats = Array.from(chatMap.values());
+      
+      // Sort by lastMessageTimestamp (most recent first)
+      const sortedChats = chats.sort((a, b) => 
+        b.lastMessageTimestamp.getTime() - a.lastMessageTimestamp.getTime()
+      );
+      
+      console.log(`�� Generated ${sortedChats.length} chat summaries from messages`);
+      return sortedChats;
+    } catch (error) {
+      console.error('❌ Failed to generate chat summaries:', error);
       return [];
     }
   }
 
-  static clearPendingMessages(): void {
+  private static formatTimestamp(timestamp: Date): string {
+    const now = new Date();
+    const diff = now.getTime() - timestamp.getTime();
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    
+    return timestamp.toLocaleDateString();
+  }
+
+
+  static getMessagesByChat(userAddress: string, chatId: string): Message[] {
+    const allMessages = this.getAllMessages(userAddress);
+    return allMessages.filter(msg => msg.chatId === chatId);
+  }
+
+  static updateMessageStatus(userAddress: string, messageId: string, status: Message['status']): void {
     try {
-      localStorage.removeItem(this.MESSAGES_KEY);
+      const messages = this.getAllMessages(userAddress);
+      const updatedMessages = messages.map(msg => 
+        msg.id === messageId ? { ...msg, status } : msg
+      );
+      const key = this.getMessagesKey(userAddress);
+      localStorage.setItem(key, JSON.stringify(updatedMessages));
     } catch (error) {
-      console.error('Failed to clear pending messages from localStorage:', error);
+      console.error('Failed to update message status:', error);
     }
   }
 
-  static getPendingMessageCount(): number {
-    return this.getPendingMessages().length;
-  }
-
-  static saveBackupSettings(settings: BackupSettings): void {
+  static saveChat(userAddress: string, chat: ChatSummary): void {
     try {
-      localStorage.setItem(this.BACKUP_SETTINGS_KEY, JSON.stringify(settings));
+      console.log(`💾 saveChat called for user: ${userAddress}`, chat);
+      
+      const key = this.getChatsKey(userAddress);
+      console.log(`🔍 Chat key: ${key}`);
+      
+      const existingChats = this.getUserChats(userAddress);
+      console.log(` Existing chats:`, existingChats);
+      
+      const updatedChats = existingChats.filter(c => c.id !== chat.id);
+      updatedChats.push(chat);
+      
+      console.log(`🔍 Updated chats:`, updatedChats);
+      
+      localStorage.setItem(key, JSON.stringify(updatedChats));
+      console.log(`✅ Chat saved to localStorage`);
+      
+      // Dispatch custom event to notify components
+      window.dispatchEvent(new CustomEvent('chatUpdated', { 
+        detail: { userAddress, chat } 
+      }));
     } catch (error) {
-      console.error('Failed to save backup settings to localStorage:', error);
+      console.error('❌ Failed to save chat to localStorage:', error);
     }
   }
 
-  static getBackupSettings(): BackupSettings {
+  static getUserChats(userAddress: string): ChatSummary[] {
     try {
-      const settingsJson = localStorage.getItem(this.BACKUP_SETTINGS_KEY);
+      const key = this.getChatsKey(userAddress);
+      console.log(`🔍 Getting chats for key: ${key}`);
+      
+      const chatsJson = localStorage.getItem(key);
+      if (!chatsJson) {
+        console.log(`📭 No chats found, generating from messages`);
+        return this.generateChatSummaries(userAddress);
+      }
+      
+      const chats = JSON.parse(chatsJson);
+      const formattedChats = chats.map((chat: any) => ({
+        ...chat,
+        lastMessageTimestamp: new Date(chat.lastMessageTimestamp)
+      }));
+      
+      // Sort by lastMessageTimestamp (most recent first)
+      const sortedChats = formattedChats.sort((a, b) => 
+        b.lastMessageTimestamp.getTime() - a.lastMessageTimestamp.getTime()
+      );
+      
+      // Update chat names and avatars based on participants
+      const updatedChats = sortedChats.map(chat => {
+        const otherParticipant = chat.participants.find((p: string) => p !== userAddress);
+        if (otherParticipant) {
+          const displayName = this.getDisplayName(otherParticipant);
+          const avatar = `https://api.dicebear.com/7.x/identicon/svg?seed=${otherParticipant}`;
+          
+          return {
+            ...chat,
+            name: displayName,
+            avatar: avatar
+          };
+        }
+        return chat;
+      });
+      
+      console.log(`💬 Retrieved ${updatedChats.length} chats for user: ${userAddress}`, updatedChats);
+      return updatedChats;
+    } catch (error) {
+      console.error('❌ Failed to get chats from localStorage:', error);
+      return this.generateChatSummaries(userAddress);
+    }
+  }
+
+  // Sync management
+  static getLastSyncTimestamp(userAddress: string): number {
+    try {
+      const key = this.getLastSyncKey(userAddress);
+      const timestamp = localStorage.getItem(key);
+      return timestamp ? parseInt(timestamp) : 0;
+    } catch (error) {
+      console.error('Failed to get last sync timestamp:', error);
+      return 0;
+    }
+  }
+
+  static updateLastSyncTimestamp(userAddress: string, timestamp: number): void {
+    try {
+      const key = this.getLastSyncKey(userAddress);
+      localStorage.setItem(key, timestamp.toString());
+    } catch (error) {
+      console.error('Failed to update last sync timestamp:', error);
+    }
+  }
+
+  // Backup settings (wallet-specific)
+  static saveBackupSettings(userAddress: string, settings: BackupSettings): void {
+    try {
+      const key = this.getBackupSettingsKey(userAddress);
+      localStorage.setItem(key, JSON.stringify(settings));
+    } catch (error) {
+      console.error('Failed to save backup settings:', error);
+    }
+  }
+
+  static getBackupSettings(userAddress: string): BackupSettings {
+    try {
+      const key = this.getBackupSettingsKey(userAddress);
+      const settingsJson = localStorage.getItem(key);
       if (!settingsJson) {
         return {
           frequencyMinutes: 5,
@@ -61,7 +384,7 @@ export class LocalStorageService {
       }
       return JSON.parse(settingsJson);
     } catch (error) {
-      console.error('Failed to get backup settings from localStorage:', error);
+      console.error('Failed to get backup settings:', error);
       return {
         frequencyMinutes: 5,
         autoBackup: true
@@ -69,26 +392,35 @@ export class LocalStorageService {
     }
   }
 
-  static updateLastBackupTimestamp(timestamp: number): void {
-    try {
-      const settings = this.getBackupSettings();
-      settings.lastBackupTimestamp = timestamp;
-      this.saveBackupSettings(settings);
-    } catch (error) {
-      console.error('Failed to update last backup timestamp:', error);
-    }
+
+
+
+  // Legacy
+  
+  static getPendingMessages(): Message[] {
+    // This is a fallback - should use wallet-specific version
+    console.warn('Using legacy getPendingMessages - please use getAllMessages(userAddress)');
+    return this.getAllMessages('default');
   }
 
-  static isBackupDue(): boolean {
-    const settings = this.getBackupSettings();
-    if (!settings.autoBackup || !settings.lastBackupTimestamp) {
-      return true;
+  static clearPendingMessages(): void {
+    // This is a fallback - should use wallet-specific version
+    console.warn('Using legacy clearPendingMessages - please use clearAllMessages(userAddress)');
+    this.clearAllMessages('default');
+  }
+
+  static getPendingMessageCount(): number {
+    // This is a fallback - should use wallet-specific version
+    console.warn('Using legacy getPendingMessageCount - please use getAllMessages(userAddress).length');
+    return this.getAllMessages('default').length;
+  }
+
+  static clearAllMessages(userAddress: string): void {
+    try {
+      const key = this.getMessagesKey(userAddress);
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.error('Failed to clear messages:', error);
     }
-    
-    const now = Date.now();
-    const timeSinceLastBackup = now - settings.lastBackupTimestamp;
-    const frequencyMs = settings.frequencyMinutes * 60 * 1000;
-    
-    return timeSinceLastBackup >= frequencyMs;
   }
 }

@@ -270,8 +270,142 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, async () => {
-  console.log(`🚀 Backend server running on port ${PORT}`);
-  await initializeWalrus();
+
+
+
+
+
+// WebSocket for real-time messaging
+const { Server } = require('socket.io');
+const http = require('http');
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
 });
+
+const messageQueue = new Map(); // address to messages
+const onlineUsers = new Set();
+const userSockets = new Map();
+
+io.on('connection', (socket) => {
+  socket.on('join', (data) => {
+    const userAddress = data.userAddress || data;
+    console.log(`👋 User ${userAddress} joined`);
+    
+    if (userSockets.has(userAddress)) {
+      const oldSocketId = userSockets.get(userAddress);
+      const oldSocket = io.sockets.sockets.get(oldSocketId);
+      if (oldSocket) {
+        oldSocket.disconnect();
+      }
+    }
+    
+    onlineUsers.add(userAddress);
+    userSockets.set(userAddress, socket.id);
+    socket.join(userAddress);
+    
+    // Send pending messages
+    const pending = messageQueue.get(userAddress) || [];
+    console.log(`📦 Found ${pending.length} pending messages for ${userAddress}`);
+    
+    if (pending.length > 0) {
+      console.log(`📤 Delivering ${pending.length} queued messages to ${userAddress}`);
+      socket.emit('messages', pending);
+      messageQueue.set(userAddress, []);
+      console.log(`✅ Cleared queue for ${userAddress}`);
+    }
+  });
+  
+  socket.on('send_message', (data) => {
+    const { message } = data;
+    
+    console.log(`📤 Received message to send:`, message);
+    console.log(`📤 Complete message object received:`, JSON.stringify(message, null, 2));
+    console.log(`🔍 Message type: ${message.type}`);
+    console.log(`🔍 Message text: ${message.text}`);
+    console.log(`🔍 Message senderAddress: ${message.senderAddress}`);
+    console.log(`🔍 Message giftData:`, message.giftData);
+  
+    // Extract participants from chatId (format: chat_address1_address2)
+    const parts = message.chatId.split('_');
+    const address1 = parts[1];
+    const address2 = parts[2];
+    
+    // The sender is the user who sent the message (we need to track this)
+    // For now, let's assume the sender is the user who is currently connected
+    // We need to track which user is sending the message
+    
+    // Find the sender by looking at the socket's user address
+    let senderAddress = null;
+    for (const [userAddr, socketId] of userSockets.entries()) {
+      if (socketId === socket.id) {
+        senderAddress = userAddr;
+        break;
+      }
+    }
+    
+    if (!senderAddress) {
+      console.log('❌ Could not determine sender address');
+      return;
+    }
+    
+    // Determine the recipient (the other participant)
+    const recipientAddress = senderAddress === address1 ? address2 : address1;
+    
+    console.log(`📤 Sending message from ${senderAddress} to ${recipientAddress}`);
+    console.log(`📝 Message details:`, {
+      id: message.id,
+      text: message.text,
+      timestamp: message.timestamp,
+      sender: senderAddress,
+      recipient: recipientAddress
+    });
+    console.log(`�� Online users:`, Array.from(onlineUsers));
+    
+    // Add sender information to the message
+    const messageWithSender = {
+      ...message,
+      senderAddress: senderAddress
+    };
+    
+    if (onlineUsers.has(recipientAddress)) {
+      // User is online, send immediately
+      console.log(`✅ User ${recipientAddress} is online, delivering immediately`);
+      io.to(recipientAddress).emit('message', {
+        type: 'message',
+        message: messageWithSender
+      });
+    } else {
+      // User is offline, queue message
+      console.log(`⏳ User ${recipientAddress} is offline, queuing message`);
+      const queue = messageQueue.get(recipientAddress) || [];
+      queue.push(messageWithSender);
+      messageQueue.set(recipientAddress, queue);
+      console.log(`📦 Queued messages for ${recipientAddress}:`, queue.length);
+    }
+  });
+  
+  socket.on('disconnect', () => {
+    for (const [userAddress, socketId] of userSockets.entries()) {
+      if (socketId === socket.id) {
+        onlineUsers.delete(userAddress);
+        userSockets.delete(userAddress);
+        console.log(` Removed ${userAddress} from online users`);
+        break;
+      }
+    }
+  });
+});
+
+
+
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(` WebSocket server ready for connections`);
+});
+
+// Initialize Walrus client
+initializeWalrus();

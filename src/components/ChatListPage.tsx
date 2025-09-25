@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,7 +8,7 @@ import { Badge } from './ui/badge';
 import ChatInterface from './ChatInterface';
 import { isValidSuiAddress } from '@mysten/sui/utils';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { CloudUpload, Settings } from 'lucide-react';
+import { ChevronLeft, CloudUpload, Settings } from 'lucide-react';
 import { BackupSettings } from './BackupSettings';
 
 type ChatSummary = {
@@ -20,30 +20,6 @@ type ChatSummary = {
   unreadCount?: number;
 };
 
-const sampleChats: ChatSummary[] = [
-  {
-    id: '1',
-    name: 'Sarah Chen',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede&radius=50',
-    lastMessage: 'See you at 5 PM!',
-    timestamp: '2m ago',
-    unreadCount: 2,
-  },
-  {
-    id: '2',
-    name: 'Dev Team',
-    avatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=DevTeam',
-    lastMessage: 'Build passed ✔️',
-    timestamp: '1h ago',
-  },
-  {
-    id: '3',
-    name: 'Penguin Bot',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=PenguinBot&backgroundColor=b6e3f4&radius=50',
-    lastMessage: 'Welcome to PenguinChat!',
-    timestamp: 'Yesterday',
-  },
-];
 
 const ChatListPage: React.FC = () => {
   const [activeChat, setActiveChat] = useState<string | null>(null);
@@ -76,88 +52,69 @@ const ChatListPage: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const loadChats = async () => {
-      if (!chatService || !user?.id) {
-        setIsLoadingChats(false);
-        return;
-      }
+  const loadChats = useCallback(async () => {
+    if (!chatService || !user?.id) {
+      setIsLoadingChats(false);
+      return;
+    }
 
-      setIsLoadingChats(true);
-      setError(null);
+    setIsLoadingChats(true);
+    setError(null);
+    
+    try {
+      const userChats = await chatService.getUserChats(user.id);
       
-      try {
-        const userChats = await chatService.getUserChats(user.id);
-        
-        if (isMountedRef.current) {
-          setChats(userChats);
-        }
-      } catch (error) {
-        console.error('Failed to load chats:', error);
-        if (isMountedRef.current) {
-          setError('Failed to load chats. Please try again.');
-          setChats([]);
-        }
-      } finally {
-        if (isMountedRef.current) {
-          setIsLoadingChats(false);
-        }
+      if (isMountedRef.current) {
+        setChats(userChats);
+      }
+    } catch (error) {
+      console.error('Failed to load chats:', error);
+      if (isMountedRef.current) {
+        setError('Failed to load chats. Please try again.');
+        setChats([]);
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoadingChats(false);
+      }
+    }
+  }, [chatService, user?.id]);
+
+  // First useEffect - load chats on mount and when dependencies change
+  useEffect(() => {
+    loadChats();
+  }, [loadChats]);
+
+  // Second useEffect - listen for chat updates
+  useEffect(() => {
+    const handleChatUpdate = (event: CustomEvent) => {
+      if (event.detail.userAddress === user?.id) {
+        loadChats();
       }
     };
 
-    loadChats();
-  }, [chatService, user?.id]);
-
-  // Handle starting a new chat
-  const handleStartNewChat = async () => {
-    if (!selectedUser || !chatService || !user?.id) return;
-    
-    try {
-      const chatId = `chat_${user.id}_${selectedUser.address}`;
-      
-      await chatService.createNewChat(user.id, chatId, selectedUser.name, selectedUser.address);
-      
-      setSelectedUser(null);
-      setQuery('');
-      
-      const userChats = await chatService.getUserChats(user.id);
-      setChats(userChats);
-      
-      setActiveChat(chatId);
-      
-    } catch (error) {
-      console.error('Failed to start new chat:', error);
-      setError('Failed to start new chat. Please try again.');
-    }
-  };
+    window.addEventListener('chatUpdated', handleChatUpdate as EventListener);
+    return () => window.removeEventListener('chatUpdated', handleChatUpdate as EventListener);
+  }, [user?.id, loadChats]);
 
   const handleUserSelect = async (address: string, name: string) => {
     if (!chatService || !user?.id) return;
     
     try {
-      // Generate a unique chat ID
-      const chatId = `chat_${user.id}_${address}`;
+      // Create a consistent chatId by sorting addresses alphabetically
+      const addresses = [user.id, address].sort();
+      const chatId = `chat_${addresses[0]}_${addresses[1]}`;
       
-      // Check if chat already exists
-      const existingChat = chats.find(c => c.id === chatId);
-      if (existingChat) {
-        // If chat exists, just open it
-        setActiveChat(chatId);
-        setQuery('');
-        return;
-      }
+      console.log(`🔍 Creating chat with consistent ID: ${chatId}`);
+      console.log(`🔍 User1: ${user.id}`);
+      console.log(`🔍 User2: ${address}`);
       
-      // Create a new chat with proper name
-      await chatService.createNewChat(user.id, chatId, name, address);
+      const avatar = `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`;
       
-      // Clear search
+      await chatService.createNewChat(user.id, chatId, name, avatar);
+      
+      setSelectedUser(null);
       setQuery('');
-      
-      // Reload chats to show the new one
-      const userChats = await chatService.getUserChats(user.id);
-      setChats(userChats);
-      
-      // Open the new chat immediately
       setActiveChat(chatId);
       
     } catch (error) {
@@ -243,27 +200,20 @@ const ChatListPage: React.FC = () => {
   if (showBackupSettings) {
     return (
       <div className="h-screen w-screen bg-gradient-to-br from-background via-background to-primary/10 flex flex-col">
-        <div className="pt-10 pb-6 text-center flex">
+        <div className="pt-10 pb-6 text-center flex items-center justify-center relative">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setShowBackupSettings(false)}
-            className="mr-4 w-10 h-10 rounded-xl hover:bg-secondary/80 smooth-transition"
+            className="absolute left-6 w-10 h-10 rounded-xl hover:bg-secondary/80 smooth-transition"
           >
-            ←
+            <ChevronLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-3xl font-mono font-bold text-foreground grow">Backup Settings</h1>
+          <h1 className="text-3xl font-mono font-bold text-foreground">Backup Settings</h1>
         </div>
         <div className="flex-1 px-6 overflow-y-auto">
           <div className="max-w-4xl mx-auto">
-            {/* Import BackupSettings component here */}
             <BackupSettings/>
-            {/* <div className="text-center py-8">
-              <p className="text-muted-foreground">Backup settings component will be rendered here</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Pending messages: {pendingMessageCount}
-              </p>
-            </div> */}
           </div>
         </div>
       </div>
@@ -273,7 +223,6 @@ const ChatListPage: React.FC = () => {
   if (activeChat) {
     const chat = chats.find(c => c.id === activeChat);
     if (!chat) {
-      // If chat not found, go back to chat list
       setActiveChat(null);
       setError('Chat not found. Returning to chat list.');
       return null;

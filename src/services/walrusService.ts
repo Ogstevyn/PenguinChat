@@ -140,7 +140,6 @@ export class WalrusService {
   
   async getUserBlobObjects(userAddress: string): Promise<SuiBlobObject[]> {
     try {
-      // Use the lite-server API instead of direct blockchain calls
       const response = await fetch(`http://localhost:3002/api/penguinchat-backups/${userAddress}`);
       
       if (!response.ok) {

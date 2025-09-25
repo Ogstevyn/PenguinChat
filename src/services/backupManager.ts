@@ -76,7 +76,7 @@ export class BackupManager {
   }> {
     try {
       const pendingMessageCount = LocalStorageService.getPendingMessageCount();
-      const settings = LocalStorageService.getBackupSettings();
+      const settings = LocalStorageService.getBackupSettings(userAddress);
       const blobObjects = await this.walrusService.getUserBlobObjects(userAddress);
       
       return {
@@ -93,9 +93,9 @@ export class BackupManager {
 
   async updateBackupFrequency(userAddress: string, frequencyMinutes: number): Promise<void> {
     try {
-      const settings = LocalStorageService.getBackupSettings();
+      const settings = LocalStorageService.getBackupSettings(userAddress);
       settings.frequencyMinutes = frequencyMinutes;
-      LocalStorageService.saveBackupSettings(settings);
+      LocalStorageService.saveBackupSettings(userAddress, settings);
       this.startAutoBackup(userAddress, frequencyMinutes);
     } catch (error) {
       console.error('Failed to update backup frequency:', error);
@@ -105,7 +105,7 @@ export class BackupManager {
 
   async initializeUser(userAddress: string, frequencyMinutes: number = 5): Promise<void> {
     try {
-      LocalStorageService.saveBackupSettings({
+      LocalStorageService.saveBackupSettings(userAddress, {
         frequencyMinutes,
         autoBackup: true
       });

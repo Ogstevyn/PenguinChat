@@ -7,11 +7,24 @@ export interface Message {
   timestamp: Date;
   isSent: boolean;
   isRead?: boolean;
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   sender: {
     name: string;
     avatar: string;
   };
   chatId: string;
+  senderAddress?: string;
+  type?: 'text' | 'image' | 'gift';
+  imageUrl?: string;
+  imageData?: string;
+  fileName?: string;
+  fileSize?: number;
+  giftData?: {
+    amount: string;
+    asset: string;
+    transactionDigest: string;
+    recipient: string;
+  };
 }
 
 interface MessageBubbleProps {

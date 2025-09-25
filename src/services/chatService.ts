@@ -1,60 +1,20 @@
-import { Message } from '../types/backup';
-import { MessageRecoveryService } from './messageRecoveryService';
+import { Message, ChatSummary } from '../types/backup';
 import { LocalStorageService } from './localStorageService';
-
-export interface ChatSummary {
-  id: string;
-  name: string;
-  avatar: string;
-  lastMessage: string;
-  timestamp: string;
-  unreadCount?: number;
-  lastMessageTimestamp: Date;
-}
+import { MessageSyncService } from './messageSyncService';
 
 export class ChatService {
-  private recoveryService: MessageRecoveryService;
-  private messageUpdateCallbacks: ((messages: Message[]) => void)[] = [];
+  private syncService: MessageSyncService;
+  private userAddress: string;
 
-  constructor(privateKey: string) {
-    this.recoveryService = new MessageRecoveryService(privateKey);
+  constructor(userAddress: string) {
+    this.userAddress = userAddress;
+    this.syncService = new MessageSyncService(userAddress);
   }
 
   async getUserChats(userAddress: string): Promise<ChatSummary[]> {
     try {
-      const pendingMessages = LocalStorageService.getPendingMessages();
-      
-      this.recoveryService.recoverUserMessagesStream(userAddress, (newMessages) => {
-        newMessages.forEach(message => {
-          LocalStorageService.saveMessage(message);
-        });
-        this.notifyMessagesUpdated(newMessages);
-      });
-      
-      if (pendingMessages.length === 0) {
-        return [];
-      }
-  
-      const messagesByChat = this.groupMessagesByChat(pendingMessages);
-      
-      const chatSummaries: ChatSummary[] = Object.entries(messagesByChat).map(([chatId, messages]) => {
-        const sortedMessages = messages.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-        const lastMessage = sortedMessages[0];
-        
-        return {
-          id: chatId,
-          name: this.getChatName(chatId, messages),
-          avatar: this.getChatAvatar(chatId, messages),
-          lastMessage: lastMessage.text,
-          timestamp: this.formatTimestamp(lastMessage.timestamp),
-          lastMessageTimestamp: lastMessage.timestamp,
-          unreadCount: 0
-        };
-      });
-  
-      chatSummaries.sort((a, b) => b.lastMessageTimestamp.getTime() - a.lastMessageTimestamp.getTime());
-      return chatSummaries;
-      
+      const localChats = LocalStorageService.getUserChats(userAddress);
+      return localChats;
     } catch (error) {
       console.error('Failed to load user chats:', error);
       return [];
@@ -63,98 +23,97 @@ export class ChatService {
 
   async getChatMessages(userAddress: string, chatId: string): Promise<Message[]> {
     try {
-      const allMessages = await this.recoveryService.recoverUserMessages(userAddress);
-      const pendingMessages = LocalStorageService.getPendingMessages();
-      
-      const chatMessages = [...allMessages, ...pendingMessages]
-        .filter(msg => msg.chatId === chatId)
-        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-      return chatMessages;
+      console.log(`🔍 Loading messages for chat ${chatId} (user: ${userAddress})`);
+      const localMessages = LocalStorageService.getMessagesByChat(userAddress, chatId);
+      console.log(`📨 Found ${localMessages.length} messages for chat ${chatId}`);
+      return localMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
     } catch (error) {
-      console.error(`Failed to load messages for chat ${chatId}:`, error);
+      console.error(`❌ Failed to load messages for chat ${chatId}:`, error);
       return [];
+    }
+  }
+
+  async sendMessage(userAddress: string, message: Message): Promise<void> {
+    try {
+      LocalStorageService.saveMessage(userAddress, message);
+      console.log('Message saved to localStorage:', message);
+      await this.syncService.sendMessage(message, true);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      throw error;
     }
   }
 
   async createNewChat(userAddress: string, chatId: string, chatName: string, chatAvatar: string): Promise<void> {
     try {
+      console.log(`🚀 Creating new chat:`, { userAddress, chatId, chatName, chatAvatar });
+      
+      // Extract the other participant's address
+      const parts = chatId.split('_');
+      const address1 = parts[1];
+      const address2 = parts[2];
+      const otherParticipantAddress = userAddress === address1 ? address2 : address1;
+      
+      // Save user mapping for the other participant
+      LocalStorageService.saveUserMapping(otherParticipantAddress, chatName);
+      console.log(`�� Saved user mapping: ${otherParticipantAddress} -> ${chatName}`);
+      
       const welcomeMessage: Message = {
-        id: Date.now().toString(),
+        id: `${Date.now()}_${Math.random()}`,
         text: `Started conversation with ${chatName}`,
         timestamp: new Date(),
         isSent: true,
         isRead: true,
+        status: 'sent',
         chatId,
         sender: {
-          name: 'You',
-          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=You&backgroundColor=b6e3f4&radius=50'
-        }
+          name: 'System',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=System&backgroundColor=b6e3f4&radius=50'
+        },
       };
-
-      LocalStorageService.saveMessage(welcomeMessage);
+  
+      // Save the welcome message
+      LocalStorageService.saveMessage(userAddress, welcomeMessage);
+      
+      // Create and save the chat summary with participants list
+      const chatSummary: ChatSummary = {
+        id: chatId,
+        name: chatName, // This will be overridden when displaying
+        avatar: chatAvatar, // This will be overridden when displaying
+        lastMessage: welcomeMessage.text,
+        timestamp: 'Just now',
+        unreadCount: 0,
+        lastMessageTimestamp: welcomeMessage.timestamp,
+        participants: [userAddress, otherParticipantAddress] // Store both participants
+      };
+      
+      console.log(`💬 Chat summary to save:`, chatSummary);
+      LocalStorageService.saveChat(userAddress, chatSummary);
+      console.log(`✅ New chat created: ${chatName}`);
     } catch (error) {
       console.error('Failed to create new chat:', error);
       throw error;
     }
   }
 
-  onMessagesUpdated(callback: (messages: Message[]) => void) {
-    this.messageUpdateCallbacks.push(callback);
+  onMessage(callback: (message: Message) => void): void {
+    this.syncService.onMessage(callback);
   }
 
-  private notifyMessagesUpdated(messages: Message[]) {
-    this.messageUpdateCallbacks.forEach(callback => callback(messages));
+  offMessage(callback: (message: Message) => void): void {
+    this.syncService.offMessage(callback);
   }
 
-  private groupMessagesByChat(messages: Message[]): Record<string, Message[]> {
-    return messages.reduce((groups, message) => {
-      const chatId = message.chatId;
-      if (!groups[chatId]) {
-        groups[chatId] = [];
-      }
-      groups[chatId].push(message);
-      return groups;
-    }, {} as Record<string, Message[]>);
+  async connect(): Promise<void> {
+    if (this.syncService) {
+      await this.syncService.connect();
+    }
   }
 
-  private getChatName(chatId: string, messages: Message[]): string {
-    const nonUserMessage = messages.find(msg => !msg.isSent);
-    if (nonUserMessage) {
-      return nonUserMessage.sender.name;
+  disconnect(): void {
+    if (this.syncService) {
+      this.syncService.disconnect();
     }
-    
-    const welcomeMessage = messages.find(msg => 
-      msg.isSent && msg.text.includes('Started conversation with')
-    );
-    if (welcomeMessage) {
-      const match = welcomeMessage.text.match(/Started conversation with (.+)/);
-      if (match) {
-        return match[1];
-      }
-    }
-    
-    const parts = chatId.split('_');
-    if (parts.length >= 3) {
-      return parts[2];
-    }
-    
-    return chatId;
-  }
-
-  private getChatAvatar(chatId: string, messages: Message[]): string {
-    const nonUserMessage = messages.find(msg => !msg.isSent);
-    if (nonUserMessage) {
-      return nonUserMessage.sender.avatar;
-    }
-    
-    const defaultAvatars: Record<string, string> = {
-      '1': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede&radius=50',
-      '2': 'https://api.dicebear.com/7.x/identicon/svg?seed=DevTeam',
-      '3': 'https://api.dicebear.com/7.x/avataaars/svg?seed=PenguinBot&backgroundColor=b6e3f4&radius=50'
-    };
-    
-    return defaultAvatars[chatId] || `https://api.dicebear.com/7.x/avataaars/svg?seed=${chatId}&backgroundColor=b6e3f4&radius=50`;
   }
 
   private formatTimestamp(timestamp: Date): string {

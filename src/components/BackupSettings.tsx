@@ -122,7 +122,7 @@ export const BackupSettings: React.FC = () => {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6">
+    <div className="w-full max-w-2xl mx-auto space-y-6 mb-4">
       {/* Backup Status Card */}
       <Card>
         <CardHeader>
@@ -262,16 +262,13 @@ export const BackupSettings: React.FC = () => {
             How It Works
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           <div className="space-y-2 text-sm">
             <p>
               • Messages are stored locally until backup
             </p>
             <p>
-              • Each backup contains only new messages since the last backup
-            </p>
-            <p>
-              • Backups are stored as objects in your wallet on Sui's Walrus network
+              • Backups are stored on Walrus
             </p>
             <p>
               • Your wallet automatically owns all backup objects

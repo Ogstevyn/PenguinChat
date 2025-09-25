@@ -1,22 +1,49 @@
 import React, { useState, useRef } from 'react';
+import { GiftButton } from './GiftButton';
 import { Button } from './ui/button';
+import { Message } from './MessageBubble';
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: Message) => void;
   disabled?: boolean;
+  recipientAddress?: string;
+  recipientName?: string;
+  chatId?: string;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ 
+  onSendMessage, 
+  disabled = false, 
+  recipientAddress = '',
+  recipientName = '',
+  chatId = ''
+}) => {
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const emojis = ['😀', '😂', '❤️', '👍', '👎', '😢', '😡', '🎉', '🔥', '💯', '👀', '🤔', '😅', '🥳', '🙌', '💪'];
+  const emojis = ['😀', '😂', '❤️', '👍', '👎', '😢', '😡', '🎉', '💧', '💰', '💚', '💙', '💜', '😅', '🥳', '🙌'];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
-      onSendMessage(message.trim());
+      // Create Message object for text messages
+      const textMessage: Message = {
+        id: `${Date.now()}_${Math.random()}`,
+        text: message.trim(),
+        timestamp: new Date(),
+        isSent: true,
+        isRead: false,
+        status: 'sending',
+        chatId: chatId,
+        sender: {
+          name: 'You',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=You&backgroundColor=b6e3f4&radius=50'
+        },
+        type: 'text'
+      };
+      
+      onSendMessage(textMessage);
       setMessage('');
       setShowEmojiPicker(false);
     }
@@ -104,17 +131,13 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false }
               }}
             />
 
-            {/* Attachment Button */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="m-2 w-8 h-8 rounded-lg hover:bg-secondary/80 smooth-transition"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
-              </svg>
-            </Button>
+              <GiftButton
+                recipientAddress={recipientAddress}
+                recipientName={recipientName}
+                onGiftSent={onSendMessage}
+                disabled={disabled}
+                chatId={chatId}
+              />
           </div>
         </div>
 

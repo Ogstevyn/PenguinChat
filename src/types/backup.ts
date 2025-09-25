@@ -6,17 +6,48 @@ export interface BackupData {
   suiObjectId?: string; // Optional: store the Sui object ID for reference
 }
 
-export interface Message {
+
+export interface MessageStatus {
   id: string;
-  text: string;
-  timestamp: Date;
-  isSent: boolean;
-  isRead?: boolean;
-  sender: {
-    name: string;
-    avatar: string;
-  };
-  chatId: string;
+  status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  timestamp: number;
+}
+
+export interface ChatSummary {
+  id: string;
+  name: string;
+  avatar: string;
+  lastMessage: string;
+  timestamp: string;
+  unreadCount: number;
+  lastMessageTimestamp: Date;
+  participants: string[];
+}
+
+export interface Message {
+    id: string;
+    text: string;
+    timestamp: Date;
+    isSent: boolean;
+    isRead?: boolean;
+    status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+    sender: {
+      name: string;
+      avatar: string;
+    };
+    chatId: string;
+    senderAddress?: string;
+    type?: 'text' | 'image' | 'gift';
+    imageUrl?: string;
+    imageData?: string;
+    fileName?: string;
+    fileSize?: number;
+    giftData?: {
+      amount: string;
+      asset: string;
+      transactionDigest: string;
+      recipient: string;
+    };
 }
 
 export interface BackupSettings {
