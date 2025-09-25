@@ -1,6 +1,7 @@
 import { WalrusService } from './walrusService';
 import { Message, BackupData, SuiBlobObject } from '../types/backup';
 import { blobIdFromInt } from '@mysten/walrus';
+import { LITE_SERVER } from '@/config';
 
 export class MessageRecoveryService {
   private walrusService: WalrusService;
@@ -14,7 +15,7 @@ export class MessageRecoveryService {
     onMessagesFound: (messages: Message[]) => void
   ): Promise<Message[]> {
     try {
-      const response = await fetch(`http://localhost:3002/api/penguinchat-backups/${userAddress}`);
+      const response = await fetch(`${LITE_SERVER}/api/penguinchat-backups/${userAddress}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -69,7 +70,7 @@ export class MessageRecoveryService {
   async recoverUserMessages(userAddress: string): Promise<Message[]> {
     try {
       // Use the same API approach
-      const response = await fetch(`http://localhost:3002/api/penguinchat-backups/${userAddress}`);
+      const response = await fetch(`${LITE_SERVER}/api/penguinchat-backups/${userAddress}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

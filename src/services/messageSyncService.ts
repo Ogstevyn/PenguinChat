@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { Message } from '../types/backup';
 import { LocalStorageService } from './localStorageService';
+import { LITE_SERVER } from '@/config';
 
 export class MessageSyncService {
   private userAddress: string;
@@ -14,7 +15,7 @@ export class MessageSyncService {
 
   async connect(): Promise<void> {
     try {
-      this.ws = io('http://localhost:3002', {
+      this.ws = io(LITE_SERVER, { 
         transports: ['websocket']
       });
       
@@ -131,7 +132,7 @@ export class MessageSyncService {
   async syncInBackground(): Promise<void> {
     try {
       const lastSync = LocalStorageService.getLastSyncTimestamp(this.userAddress);
-      const response = await fetch(`http://localhost:3002/api/messages/${this.userAddress}/sync?since=${lastSync}`);
+      const response = await fetch(`${LITE_SERVER}/api/messages/${this.userAddress}/sync?since=${lastSync}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -233,7 +234,7 @@ export class MessageSyncService {
 
   private async sendMessageViaHTTP(message: Message): Promise<void> {
     try {
-      const response = await fetch('http://localhost:3002/api/messages/send', {
+      const response = await fetch(`${LITE_SERVER}/api/messages/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

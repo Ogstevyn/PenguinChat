@@ -4,6 +4,7 @@ import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import walrusWasmUrl from '@mysten/walrus-wasm/web/walrus_wasm_bg.wasm?url';
 import { WalrusClient, RetryableWalrusClientError } from "@mysten/walrus";
 import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+import { LITE_SERVER } from '@/config';
 
 export class WalrusService {
   private client: SuiClient;
@@ -140,7 +141,7 @@ export class WalrusService {
   
   async getUserBlobObjects(userAddress: string): Promise<SuiBlobObject[]> {
     try {
-      const response = await fetch(`http://localhost:3002/api/penguinchat-backups/${userAddress}`);
+      const response = await fetch(`${LITE_SERVER}/api/penguinchat-backups/${userAddress}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -186,7 +187,7 @@ export class WalrusService {
   async getPenguinChatBackups(userAddress: string): Promise<any[]> {
     try {
       // Use the lite-server API directly
-      const response = await fetch(`http://localhost:3002/api/penguinchat-backups/${userAddress}`);
+      const response = await fetch(`${LITE_SERVER}/api/penguinchat-backups/${userAddress}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
