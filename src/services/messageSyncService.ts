@@ -16,7 +16,11 @@ export class MessageSyncService {
   async connect(): Promise<void> {
     try {
       this.ws = io(LITE_SERVER, { 
-        transports: ['websocket']
+        transports: ['websocket', 'polling'], // Add polling as fallback
+        upgrade: true,
+        rememberUpgrade: true,
+        timeout: 20000,
+        forceNew: true
       });
       
       this.ws.on('connect', () => {

@@ -10,7 +10,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || ['http://localhost:3000', 'https://penguinchat-frontend.onrender.com'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '10mb' }));
 
 let walrusClient;
@@ -20,7 +25,7 @@ let suiClient;
 const initializeWalrus = async () => {
   try {
     const network = process.env.WALRUS_NETWORK || 'testnet';
-    const privateKey = process.env.PRIVATE_KEY || 'suiprivkey1qpqywg8f9kdhcfs3j23l0g0ejljxdawmxkjyypfs58ggzuj5j5hhxy7gaex';
+    const privateKey = process.env.PRIVATE_KEY || '';
     
     keypair = Ed25519Keypair.fromSecretKey(privateKey);
     

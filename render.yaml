@@ -11,5 +11,5 @@ services:
       - key: PORT
         value: 3002
       - key: CORS_ORIGIN
-        value: http://localhost:3000
+        value: https://penguinchat-frontend.onrender.com
     healthCheckPath: /health
