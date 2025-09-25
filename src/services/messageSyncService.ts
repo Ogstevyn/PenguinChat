@@ -2,6 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { Message } from '../types/backup';
 import { LocalStorageService } from './localStorageService';
 import { LITE_SERVER } from '@/config';
+import { OnlineStatusService } from './onlineStatusService';
 
 export class MessageSyncService {
   private userAddress: string;
@@ -21,6 +22,13 @@ export class MessageSyncService {
         rememberUpgrade: true,
         timeout: 20000,
         forceNew: true
+      });
+      this.ws.on('user_online', (data) => {
+        OnlineStatusService.updateUserStatus(data.address, true);
+      });
+      
+      this.ws.on('user_offline', (data) => {
+        OnlineStatusService.updateUserStatus(data.address, false);
       });
       
       this.ws.on('connect', () => {

@@ -143,7 +143,7 @@ static generateLocalAvatar(address: string, size: number = 40): string {
   // Synchronous version (for immediate use)
   static getAvatarUrl(address: string, name?: string): string {
     if (name) {
-      return `https://robohash.org/${address}?size=200x200&set=set3`;
+      return `https://robohash.org/${address}?size=200x200&set=set1`;
     }
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=40&background=random&color=fff&bold=true`;
   }

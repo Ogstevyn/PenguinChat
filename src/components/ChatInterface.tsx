@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { isValidSuiAddress } from '@mysten/sui/utils';
 import ChatHeader from './ChatHeader';
 import MessageBubble, { Message } from './MessageBubble';
 import ChatInput from './ChatInput';
 import { useBackup } from '../contexts/BackupContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { LocalStorageService } from '@/services/localStorageService';
+import { LocalStorageService } from '@/services/localStorageService'; 
+import { OnlineStatusService } from '@/services/onlineStatusService';
 
 interface ChatInterfaceProps {
   chatId: string;
@@ -24,9 +26,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAva
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [isRecipientOnline, setIsRecipientOnline] = useState(false);
+
   const { user } = useAuth();
   
   const { chatService } = useBackup();
+
+
+  if (isValidSuiAddress(chatName)) {
+    chatName = `${chatName.slice(0, 6)}...${chatName.slice(-4)}`;
+  }
+
+
+  const getRecipientInfo = () => {
+    const parts = chatId.split('_');
+    const address1 = parts[1];
+    const address2 = parts[2];
+    const recipientAddress = user?.id === address1 ? address2 : address1;
+    return {
+      address: recipientAddress,
+      name: chatName
+    };
+  };
+
+  const recipientInfo = getRecipientInfo();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -36,6 +59,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAva
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    if (!recipientInfo.address) {
+      console.log('⚠️ No recipient address, skipping online status subscription');
+      return;
+    }
+  
+    console.log(`🔔 Setting up online status subscription for: ${recipientInfo.address}`);
+    
+    const unsubscribe = OnlineStatusService.subscribeToUserStatus(
+      recipientInfo.address,
+      (isOnline) => {
+        console.log(`📊 Received online status update for ${recipientInfo.address}: ${isOnline}`);
+        setIsRecipientOnline(isOnline);
+      }
+    );
+  
+    return () => {
+      console.log(`🔕 Cleaning up online status subscription for: ${recipientInfo.address}`);
+      unsubscribe();
+    };
+  }, [recipientInfo.address]);
+  
   useEffect(() => {
     if (!chatService || !user?.id) return;
 
@@ -93,19 +138,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAva
     loadMessages();
   }, [chatService, user?.id, chatId]);
 
-  const getRecipientInfo = () => {
-    const parts = chatId.split('_');
-    const address1 = parts[1];
-    const address2 = parts[2];
-    const recipientAddress = user?.id === address1 ? address2 : address1;
-    return {
-      address: recipientAddress,
-      name: chatName
-    };
-  };
-
-
-  const recipientInfo = getRecipientInfo();
 
   const handleSendMessage = async (message: Message) => {
     const newMessage: Message = {
@@ -146,7 +178,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAva
       <ChatHeader
         chatName={chatName}
         chatAvatar={chatAvatar}
-        isOnline={true}
+        isOnline={isRecipientOnline}
         onBack={onBack}
       />
 

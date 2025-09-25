@@ -275,6 +275,23 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/api/user/:address/status', (req, res) => {
+  const { address } = req.params;
+  const isOnline = onlineUsers.has(address);
+  
+  res.json({
+    address,
+    isOnline,
+    lastSeen: isOnline ? new Date().toISOString() : null
+  });
+});
+
+app.get('/api/users/online', (req, res) => {
+  res.json({
+    onlineUsers: Array.from(onlineUsers),
+    count: onlineUsers.size
+  });
+});
 
 
 
@@ -322,6 +339,8 @@ io.on('connection', (socket) => {
       messageQueue.set(userAddress, []);
       console.log(`✅ Cleared queue for ${userAddress}`);
     }
+
+    socket.broadcast.emit('user_online', { address: userAddress });
   });
   
   socket.on('send_message', (data) => {
@@ -334,16 +353,10 @@ io.on('connection', (socket) => {
     console.log(`🔍 Message senderAddress: ${message.senderAddress}`);
     console.log(`🔍 Message giftData:`, message.giftData);
   
-    // Extract participants from chatId (format: chat_address1_address2)
     const parts = message.chatId.split('_');
     const address1 = parts[1];
     const address2 = parts[2];
     
-    // The sender is the user who sent the message (we need to track this)
-    // For now, let's assume the sender is the user who is currently connected
-    // We need to track which user is sending the message
-    
-    // Find the sender by looking at the socket's user address
     let senderAddress = null;
     for (const [userAddr, socketId] of userSockets.entries()) {
       if (socketId === socket.id) {
@@ -399,6 +412,7 @@ io.on('connection', (socket) => {
         onlineUsers.delete(userAddress);
         userSockets.delete(userAddress);
         console.log(` Removed ${userAddress} from online users`);
+        socket.broadcast.emit('user_offline', { address: userAddress });
         break;
       }
     }
