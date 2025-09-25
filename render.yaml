@@ -1,10 +1,9 @@
 services:
-  # Backend API + WebSocket Server
   - type: web
-    name: penguinchat-backend
+    name: penguinchat
     env: node
-    buildCommand: cd PenguinChat/lite-server && npm ci
-    startCommand: cd PenguinChat/lite-server && npm start
+    buildCommand: cd lite-server && npm ci
+    startCommand: cd lite-server && npm start
     plan: starter
     envVars:
       - key: NODE_ENV
@@ -14,4 +13,3 @@ services:
       - key: CORS_ORIGIN
         value: http://localhost:3000
     healthCheckPath: /health
-    websocketSupport: true
