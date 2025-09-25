@@ -143,9 +143,9 @@ static generateLocalAvatar(address: string, size: number = 40): string {
   // Synchronous version (for immediate use)
   static getAvatarUrl(address: string, name?: string): string {
     if (name) {
-      return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=40&background=random&color=fff&bold=true`;
+      return `https://robohash.org/${address}?size=200x200&set=set3`;
     }
-    return `https://api.multiavatar.com/${address}.svg`;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=40&background=random&color=fff&bold=true`;
   }
 
   static saveUserMapping(userAddress: string, displayName: string): void {
