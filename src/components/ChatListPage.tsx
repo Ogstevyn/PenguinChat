@@ -205,9 +205,9 @@ const ChatListPage: React.FC = () => {
             variant="ghost"
             size="sm"
             onClick={() => setShowBackupSettings(false)}
-            className="absolute left-6 w-10 h-10 rounded-xl hover:bg-secondary/80 smooth-transition"
+            className="absolute left-6 w-10 h-10 rounded-xl bg-secondary/30 hover:bg-secondary/80 smooth-transition"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-6 h-6" />
           </Button>
           <h1 className="text-3xl font-mono font-bold text-foreground">Backup Settings</h1>
         </div>

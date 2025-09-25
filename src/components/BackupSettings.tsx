@@ -122,7 +122,7 @@ export const BackupSettings: React.FC = () => {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6 mb-4">
+    <div className="w-full max-w-2xl mx-auto space-y-6 mb-6">
       {/* Backup Status Card */}
       <Card>
         <CardHeader>
