@@ -68,7 +68,7 @@ export class ChatService {
         chatId,
         sender: {
           name: 'System',
-          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=System&backgroundColor=b6e3f4&radius=50'
+          avatar: LocalStorageService.getAvatarUrl("0x1", "System")
         },
       };
   

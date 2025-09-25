@@ -62,7 +62,7 @@ export class LocalStorageService {
         chatSummary = {
           id: message.chatId,
           name: this.getDisplayName(otherParticipantAddress), // Use display name
-          avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${otherParticipantAddress}`,
+          avatar: LocalStorageService.getAvatarUrl(otherParticipantAddress, this.getDisplayName(otherParticipantAddress)),
           lastMessage: message.text,
           timestamp: this.formatTimestamp(message.timestamp),
           unreadCount: 0,
@@ -81,6 +81,71 @@ export class LocalStorageService {
     } catch (error) {
       console.error('❌ Failed to update chat summary:', error);
     }
+  }
+
+
+static generateLocalAvatar(address: string, size: number = 40): string {
+  const colors = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
+    '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'
+  ];
+  
+  const colorIndex = parseInt(address.slice(2, 8), 16) % colors.length;
+  const initials = address.slice(2, 4).toUpperCase();
+  const bgColor = colors[colorIndex];
+  
+  const svg = `
+    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="grad-${address.slice(2, 8)}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:${bgColor};stop-opacity:1" />
+          <stop offset="100%" style="stop-color:${bgColor}CC;stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      <circle cx="${size/2}" cy="${size/2}" r="${size/2}" fill="url(#grad-${address.slice(2, 8)})"/>
+      <text x="${size/2}" y="${size/2 + 6}" text-anchor="middle" fill="white" font-size="${size/3}" font-weight="bold" font-family="system-ui">${initials}</text>
+    </svg>
+  `;
+  
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
+  static async getAvatarUrlAsync(address: string, name?: string): Promise<string> {
+    // Try UI Avatars first (if we have a name)
+    if (name) {
+      try {
+        const uiAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=40&background=random&color=fff&bold=true`;
+        // Test if the URL is accessible
+        const response = await fetch(uiAvatarUrl, { method: 'HEAD' });
+        if (response.ok) {
+          return uiAvatarUrl;
+        }
+      } catch (error) {
+        console.log('UI Avatars failed, trying next service...');
+      }
+    }
+    
+    // Try Multiavatar
+    try {
+      const multiavatarUrl = `https://api.multiavatar.com/${address}.svg`;
+      const response = await fetch(multiavatarUrl, { method: 'HEAD' });
+      if (response.ok) {
+        return multiavatarUrl;
+      }
+    } catch (error) {
+      console.log('Multiavatar failed, using local generation...');
+    }
+    
+    // Final fallback to local generation
+    return this.generateLocalAvatar(address);
+  }
+
+  // Synchronous version (for immediate use)
+  static getAvatarUrl(address: string, name?: string): string {
+    if (name) {
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=40&background=random&color=fff&bold=true`;
+    }
+    return `https://api.multiavatar.com/${address}.svg`;
   }
 
   static saveUserMapping(userAddress: string, displayName: string): void {
@@ -209,7 +274,7 @@ export class LocalStorageService {
           chatMap.set(chatId, {
             id: chatId,
             name: recipientShort,
-            avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${recipientAddress}`,
+            avatar: LocalStorageService.getAvatarUrl(recipientAddress, recipientShort),
             lastMessage: message.text,
             timestamp: this.formatTimestamp(message.timestamp),
             unreadCount: 0,
@@ -322,7 +387,7 @@ export class LocalStorageService {
         const otherParticipant = chat.participants.find((p: string) => p !== userAddress);
         if (otherParticipant) {
           const displayName = this.getDisplayName(otherParticipant);
-          const avatar = `https://api.dicebear.com/7.x/identicon/svg?seed=${otherParticipant}`;
+          const avatar = LocalStorageService.getAvatarUrl(otherParticipant, displayName);
           
           return {
             ...chat,

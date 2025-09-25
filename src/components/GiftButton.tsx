@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { Message } from './MessageBubble';
+import { LocalStorageService } from '@/services/localStorageService';
 
 interface GiftButtonProps {
   recipientAddress: string;
@@ -206,7 +207,7 @@ const loadUserAssets = async () => {
         chatId: chatId,
         sender: {
           name: 'You',
-          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=You&backgroundColor=b6e3f4&radius=50'
+          avatar: LocalStorageService.getAvatarUrl("0x1", "You"),
         },
         type: 'gift',
         senderAddress: account.address,
@@ -513,7 +514,7 @@ const GiftButton: React.FC<GiftButtonProps> = ({
       chatId: '', // Will be set by parent
       sender: {
         name: 'You',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=You&backgroundColor=b6e3f4&radius=50'
+        avatar: LocalStorageService.getAvatarUrl("0x1", "You")
       },
       type: 'gift',
       giftData: {

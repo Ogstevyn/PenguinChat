@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { GiftButton } from './GiftButton';
 import { Button } from './ui/button';
 import { Message } from './MessageBubble';
+import { LocalStorageService } from '@/services/localStorageService';
 
 interface ChatInputProps {
   onSendMessage: (message: Message) => void;
@@ -38,7 +39,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         chatId: chatId,
         sender: {
           name: 'You',
-          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=You&backgroundColor=b6e3f4&radius=50'
+          avatar: LocalStorageService.getAvatarUrl("0x1", "You")
         },
         type: 'text'
       };

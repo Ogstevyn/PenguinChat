@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useCurrentAccount, useDisconnectWallet } from '@mysten/dapp-kit';
+import { LocalStorageService } from '@/services/localStorageService';
 
 interface User {
   id: string;
@@ -36,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser({
         id: address,
         name: short,
-        avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
+        avatar: LocalStorageService.getAvatarUrl(address, short),
       });
     } else {
       setUser(null);

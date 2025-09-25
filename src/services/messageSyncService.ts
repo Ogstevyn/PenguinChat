@@ -41,7 +41,7 @@ export class MessageSyncService {
               // Ensure received messages have proper sender info
               sender: msg.sender || {
                 name: `${msg.chatId.split('_')[1].slice(0, 6)}...${msg.chatId.split('_')[1].slice(-4)}`,
-                avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${msg.chatId.split('_')[1]}`
+                avatar: LocalStorageService.getAvatarUrl(msg.chatId.split('_')[1], `${msg.chatId.split('_')[1].slice(0, 6)}...${msg.chatId.split('_')[1].slice(-4)}`)
               }
             };
             console.log(`�� Processing queued message ${index + 1}/${messages.length}:`, message);
@@ -61,7 +61,7 @@ export class MessageSyncService {
               // Ensure received messages have proper sender info
               sender: data.message.sender || {
                 name: `${data.message.chatId.split('_')[1].slice(0, 6)}...${data.message.chatId.split('_')[1].slice(-4)}`,
-                avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${data.message.chatId.split('_')[1]}`
+                avatar: LocalStorageService.getAvatarUrl(data.message.chatId.split('_')[1], `${data.message.chatId.split('_')[1].slice(0, 6)}...${data.message.chatId.split('_')[1].slice(-4)}`)
               }
             };
             this.handleIncomingMessage(message);

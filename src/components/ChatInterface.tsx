@@ -4,6 +4,7 @@ import MessageBubble, { Message } from './MessageBubble';
 import ChatInput from './ChatInput';
 import { useBackup } from '../contexts/BackupContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { LocalStorageService } from '@/services/localStorageService';
 
 interface ChatInterfaceProps {
   chatId: string;
@@ -14,7 +15,7 @@ interface ChatInterfaceProps {
 
 const currentUser = {
   name: 'You',
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=You&backgroundColor=b6e3f4&radius=50',
+  avatar: LocalStorageService.getAvatarUrl("0x1", "You"),
 };
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, chatName, chatAvatar, onBack }) => {

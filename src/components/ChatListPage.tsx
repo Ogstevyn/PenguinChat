@@ -10,6 +10,7 @@ import { isValidSuiAddress } from '@mysten/sui/utils';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { ChevronLeft, CloudUpload, Settings } from 'lucide-react';
 import { BackupSettings } from './BackupSettings';
+import { LocalStorageService } from '@/services/localStorageService';
 
 type ChatSummary = {
   id: string;
@@ -109,7 +110,7 @@ const ChatListPage: React.FC = () => {
       console.log(`🔍 User1: ${user.id}`);
       console.log(`🔍 User2: ${address}`);
       
-      const avatar = `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`;
+      const avatar = LocalStorageService.getAvatarUrl(address, name);
       
       await chatService.createNewChat(user.id, chatId, name, avatar);
       
