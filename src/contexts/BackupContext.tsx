@@ -82,7 +82,7 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
       const recovery = new MessageRecoveryService(dummyPrivateKey);
       const chat = new ChatService(user.id);
       
-      await manager.initializeUser(user.id, 1);
+      await manager.initializeUser(user.id, 5);
       await chat.connect();
       
       setBackupManager(manager);

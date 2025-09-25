@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { useBackup } from '../contexts/BackupContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -226,31 +225,28 @@ export const BackupSettings: React.FC = () => {
             />
           </div>
 
-          {/* Manual Backup Button */}
-          <div className="pt-4 border-t">
-            <Button
-              onClick={handleManualBackup}
-              disabled={isBackingUp || pendingMessageCount === 0}
-              className="w-full"
-            >
-              {isBackingUp ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Backing up...
-                </>
-              ) : (
-                <>
-                  <CloudUpload className="w-4 h-4 mr-2" />
-                  Backup Now ({pendingMessageCount} messages)
-                </>
-              )}
-            </Button>
-            {pendingMessageCount === 0 && (
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                No pending messages to backup
-              </p>
+          <Button
+            onClick={handleManualBackup}
+            disabled={isBackingUp || pendingMessageCount === 0}
+            className="w-full"
+          >
+            {isBackingUp ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Backing up...
+              </>
+            ) : (
+              <>
+                <CloudUpload className="w-4 h-4 mr-2" />
+                Backup Now ({pendingMessageCount} messages)
+              </>
             )}
-          </div>
+          </Button>
+          {pendingMessageCount === 0 && (
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              No messages to backup
+            </p>
+          )}
         </CardContent>
       </Card>
 

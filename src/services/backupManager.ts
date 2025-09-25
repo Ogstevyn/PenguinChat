@@ -15,6 +15,8 @@ export class BackupManager {
     this.stopAutoBackup();
     const frequencyMs = frequencyMinutes * 60 * 1000;
     
+    console.log(`🔄 Starting auto backup for ${userAddress} every ${frequencyMinutes} minutes`);
+    
     this.backupInterval = setInterval(async () => {
       try {
         await this.performBackup(userAddress);
@@ -28,25 +30,29 @@ export class BackupManager {
     if (this.backupInterval) {
       clearInterval(this.backupInterval);
       this.backupInterval = null;
+      console.log('�� Stopped auto backup');
     }
   }
 
   async performBackup(userAddress: string): Promise<string | null> {
-    return null;
     if (this.isBackingUp) {
+      console.log('⏳ Backup already in progress, skipping...');
       return null;
     }
 
     this.isBackingUp = true;
 
     try {
-      const pendingMessages = LocalStorageService.getPendingMessages();
+      const allMessages = LocalStorageService.getAllMessages(userAddress);
       
-      if (pendingMessages.length === 0) {
+      if (allMessages.length === 0) {
+        console.log('�� No messages to backup');
         return null;
       }
 
-      const conversations = this.groupMessagesByChat(pendingMessages);
+      console.log(`📦 Backing up ${allMessages.length} messages for user ${userAddress}`);
+
+      const conversations = this.groupMessagesByChat(allMessages);
 
       const backupData: BackupData = {
         timestamp: Date.now(),
@@ -56,12 +62,14 @@ export class BackupManager {
       };
 
       const newBlobId = await this.walrusService.uploadBackup(backupData);
-      LocalStorageService.clearPendingMessages();
-      LocalStorageService.updateLastBackupTimestamp(Date.now());
-
+      
+      // Update last backup timestamp
+      LocalStorageService.updateLastSyncTimestamp(userAddress, Date.now());
+      
+      console.log(`✅ Backup completed successfully: ${newBlobId}`);
       return newBlobId;
     } catch (error) {
-      console.error('Backup failed:', error);
+      console.error('❌ Backup failed:', error);
       throw error;
     } finally {
       this.isBackingUp = false;
@@ -75,13 +83,14 @@ export class BackupManager {
     totalBackups: number;
   }> {
     try {
-      const pendingMessageCount = LocalStorageService.getPendingMessageCount();
+      // Use current system - get all messages for user
+      const allMessages = LocalStorageService.getAllMessages(userAddress);
       const settings = LocalStorageService.getBackupSettings(userAddress);
       const blobObjects = await this.walrusService.getUserBlobObjects(userAddress);
       
       return {
         hasBackups: blobObjects.length > 0,
-        pendingMessageCount,
+        pendingMessageCount: allMessages.length, // All messages are "pending" backup
         lastBackupTimestamp: settings.lastBackupTimestamp || null,
         totalBackups: blobObjects.length
       };
@@ -105,12 +114,16 @@ export class BackupManager {
 
   async initializeUser(userAddress: string, frequencyMinutes: number = 5): Promise<void> {
     try {
+      console.log(`🚀 Initializing backup system for user: ${userAddress}`);
+      
       LocalStorageService.saveBackupSettings(userAddress, {
         frequencyMinutes,
-        autoBackup: true
+        autoBackup: true,
+        lastBackupTimestamp: null
       });
       
       this.startAutoBackup(userAddress, frequencyMinutes);
+      console.log(`✅ Backup system initialized for user: ${userAddress}`);
     } catch (error) {
       console.error('Failed to initialize user backup system:', error);
       throw error;
