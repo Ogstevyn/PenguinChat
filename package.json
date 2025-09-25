@@ -10,6 +10,9 @@
     "lint": "eslint .",
     "preview": "vite preview"
   },
+  "config": {
+    "legacy-peer-deps": true
+  },
   "dependencies": {
     "@lucide/lab": "^0.1.2",
     "@mysten/dapp-kit": "^0.16.15",
