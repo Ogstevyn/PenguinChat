@@ -252,7 +252,7 @@ static generateLocalAvatar(address: string, size: number = 40): string {
       return [];
     }
   }
-  
+
 
   static generateChatSummaries(userAddress: string): ChatSummary[] {
     try {

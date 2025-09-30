@@ -54,8 +54,9 @@ const BackupProviderInner: React.FC<BackupProviderProps> = ({ children }) => {
   const [pendingMessageCount, setPendingMessageCount] = useState(0);
   const [lastBackupTimestamp, setLastBackupTimestamp] = useState<number | null>(null);
 
+
   // Use the new Walrus backup hook
-  const walrusBackupMutation = useWalrusBackup();
+  const walrusBackup = useWalrusBackup();
 
   useEffect(() => {
     if (user?.id) {
@@ -167,8 +168,7 @@ const BackupProviderInner: React.FC<BackupProviderProps> = ({ children }) => {
         conversations
       };
 
-      // Use the new Walrus backup hook
-      const blobId = await walrusBackupMutation.mutateAsync(backupData);
+      const blobId = await walrusBackup.upload.mutateAsync(backupData);
       
       const settings = LocalStorageService.getBackupSettings(user.id);
       settings.lastBackupTimestamp = Date.now();
@@ -200,11 +200,27 @@ const BackupProviderInner: React.FC<BackupProviderProps> = ({ children }) => {
       const allMessages = LocalStorageService.getAllMessages(user.id);
       const settings = LocalStorageService.getBackupSettings(user.id);
       
+      const hasLocalBackup = settings.lastBackupTimestamp !== null;
+      const localBackupCount = hasLocalBackup ? 1 : 0;
+      
+      if (walrusBackup.getUserBlobs.isLoading) {
+        return {
+          hasBackups: hasLocalBackup,
+          pendingMessageCount: pendingMessageCount,
+          lastBackupTimestamp: settings.lastBackupTimestamp || null,
+          totalBackups: localBackupCount
+        };
+      }
+      const { blobs } = walrusBackup;
+      const totalBackups = blobs.length;
+      
+      console.log(`🔍 Found ${totalBackups} actual backups on Walrus for user ${user.id}`);
+      
       return {
-        hasBackups: settings.lastBackupTimestamp !== null,
+        hasBackups: totalBackups > 0,
         pendingMessageCount: pendingMessageCount,
         lastBackupTimestamp: settings.lastBackupTimestamp || null,
-        totalBackups: settings.lastBackupTimestamp ? 1 : 0
+        totalBackups: totalBackups
       };
     } catch (error) {
       console.error('Failed to get backup status:', error);
@@ -222,8 +238,8 @@ const BackupProviderInner: React.FC<BackupProviderProps> = ({ children }) => {
     performBackup,
     updateBackupFrequency,
     getBackupStatus,
-    isBackingUp: walrusBackupMutation.isPending,
-    backupError: walrusBackupMutation.error?.message || null,
+    isBackingUp: walrusBackup.isUploading,
+    backupError: walrusBackup.uploadError,
   };
 
   return (

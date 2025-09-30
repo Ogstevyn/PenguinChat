@@ -46,10 +46,12 @@ export class BackupManager {
     try {
       console.log(`🚀 Initializing backup system for user: ${userAddress}`);
       
+      const existingSettings = LocalStorageService.getBackupSettings(userAddress);
+    
       LocalStorageService.saveBackupSettings(userAddress, {
         frequencyMinutes,
         autoBackup: true,
-        lastBackupTimestamp: null
+        lastBackupTimestamp: existingSettings.lastBackupTimestamp || null
       });
       
       this.startAutoBackup(userAddress, frequencyMinutes);
