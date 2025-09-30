@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BackupManager } from '../services/backupManager';
 import { MessageRecoveryService } from '../services/messageRecoveryService';
 import { LocalStorageService } from '../services/localStorageService';
 import { useAuth } from './AuthContext';
 import { ChatService } from '../services/chatService';
-
+import { useWalrusBackup } from '../hooks/useWalrusBackup';
 
 interface BackupContextType {
   backupManager: BackupManager | null;
@@ -16,6 +17,8 @@ interface BackupContextType {
   performBackup: () => Promise<string | null>;
   updateBackupFrequency: (frequencyMinutes: number) => Promise<void>;
   getBackupStatus: () => Promise<any>;
+  isBackingUp: boolean;
+  backupError: string | null;
 }
 
 const BackupContext = createContext<BackupContextType | undefined>(undefined);
@@ -32,7 +35,17 @@ interface BackupProviderProps {
   children: React.ReactNode;
 }
 
-export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
+// Create a query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    mutations: {
+      retry: 3,
+      retryDelay: 1000,
+    },
+  },
+});
+
+const BackupProviderInner: React.FC<BackupProviderProps> = ({ children }) => {
   const { user } = useAuth();
   const [backupManager, setBackupManager] = useState<BackupManager | null>(null);
   const [recoveryService, setRecoveryService] = useState<MessageRecoveryService | null>(null);
@@ -41,6 +54,8 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
   const [pendingMessageCount, setPendingMessageCount] = useState(0);
   const [lastBackupTimestamp, setLastBackupTimestamp] = useState<number | null>(null);
 
+  // Use the new Walrus backup hook
+  const walrusBackupMutation = useWalrusBackup();
 
   useEffect(() => {
     if (user?.id) {
@@ -61,9 +76,21 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
   useEffect(() => {
     const interval = setInterval(() => {
       if (user?.id) {
-        setPendingMessageCount(LocalStorageService.getAllMessages(user.id).length);
+        const allMessages = LocalStorageService.getAllMessages(user.id);
         const settings = LocalStorageService.getBackupSettings(user.id);
-        setLastBackupTimestamp(settings.lastBackupTimestamp || null);
+        const lastBackupTime = settings.lastBackupTimestamp;
+        
+        let pendingCount = 0;
+        if (lastBackupTime) {
+          pendingCount = allMessages.filter(msg => 
+            msg.timestamp.getTime() > lastBackupTime
+          ).length;
+        } else {
+          pendingCount = allMessages.length;
+        }
+        
+        setPendingMessageCount(pendingCount);
+        setLastBackupTimestamp(lastBackupTime || null);
       }
     }, 1000);
 
@@ -76,10 +103,8 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
     try {
       console.log('🔧 Initializing backup system for user:', user.id);
       
-      const dummyPrivateKey = "suiprivkey1qpqywg8f9kdhcfs3j23l0g0ejljxdawmxkjyypfs58ggzuj5j5hhxy7gaex";
-      
-      const manager = new BackupManager(dummyPrivateKey);
-      const recovery = new MessageRecoveryService(dummyPrivateKey);
+      const manager = new BackupManager();
+      const recovery = new MessageRecoveryService();
       const chat = new ChatService(user.id);
       
       await manager.initializeUser(user.id, 5);
@@ -92,6 +117,10 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
       
       // Log all messages for this user
       const allMessages = LocalStorageService.getAllMessages(user.id);
+      console.log(`📨 All messages for user ${user.id}:`, allMessages);
+      console.log(`📊 Total messages: ${allMessages.length}`);
+      
+      console.log('✅ Backup system initialized for user:', user.id);
     } catch (error) {
       console.error('❌ Failed to initialize backup system:', error);
     }
@@ -107,10 +136,52 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
   };
 
   const performBackup = async (): Promise<string | null> => {
-    if (!backupManager || !user?.id) {
-      throw new Error('Backup system not initialized');
+    if (!user?.id) {
+      throw new Error('User not connected');
     }
-    return await backupManager.performBackup(user.id);
+
+    try {
+      const allMessages = LocalStorageService.getAllMessages(user.id);
+      
+      if (allMessages.length === 0) {
+        console.log('📭 No messages to backup');
+        return null;
+      }
+
+      console.log(`📦 Backing up ${allMessages.length} messages for user ${user.id}`);
+
+      // Group messages by chat
+      const conversations = allMessages.reduce((groups, message) => {
+        const chatId = message.chatId;
+        if (!groups[chatId]) {
+          groups[chatId] = [];
+        }
+        groups[chatId].push(message);
+        return groups;
+      }, {} as Record<string, any[]>);
+
+      const backupData = {
+        timestamp: Date.now(),
+        appId: "penguinchat",
+        version: "1.0.0",
+        conversations
+      };
+
+      // Use the new Walrus backup hook
+      const blobId = await walrusBackupMutation.mutateAsync(backupData);
+      
+      const settings = LocalStorageService.getBackupSettings(user.id);
+      settings.lastBackupTimestamp = Date.now();
+      LocalStorageService.saveBackupSettings(user.id, settings);
+      
+      setLastBackupTimestamp(Date.now());
+      
+      console.log(`✅ Backup completed successfully: ${blobId}`);
+      return blobId;
+    } catch (error) {
+      console.error('❌ Backup failed:', error);
+      throw error;
+    }
   };
 
   const updateBackupFrequency = async (frequencyMinutes: number): Promise<void> => {
@@ -121,27 +192,51 @@ export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
   };
 
   const getBackupStatus = async () => {
-    if (!backupManager || !user?.id) {
+    if (!user?.id) {
       return null;
     }
-    return await backupManager.getBackupStatus(user.id);
+    
+    try {
+      const allMessages = LocalStorageService.getAllMessages(user.id);
+      const settings = LocalStorageService.getBackupSettings(user.id);
+      
+      return {
+        hasBackups: settings.lastBackupTimestamp !== null,
+        pendingMessageCount: pendingMessageCount,
+        lastBackupTimestamp: settings.lastBackupTimestamp || null,
+        totalBackups: settings.lastBackupTimestamp ? 1 : 0
+      };
+    } catch (error) {
+      console.error('Failed to get backup status:', error);
+      throw error;
+    }
   };
 
   const value: BackupContextType = {
     backupManager,
     recoveryService,
-    chatService, // Add this
+    chatService,
     isInitialized,
     pendingMessageCount,
     lastBackupTimestamp,
     performBackup,
     updateBackupFrequency,
     getBackupStatus,
+    isBackingUp: walrusBackupMutation.isPending,
+    backupError: walrusBackupMutation.error?.message || null,
   };
 
   return (
     <BackupContext.Provider value={value}>
       {children}
     </BackupContext.Provider>
+  );
+};
+
+export const BackupProvider: React.FC<BackupProviderProps> = ({ children }) => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BackupProviderInner>{children}</BackupProviderInner>
+    </QueryClientProvider>
   );
 };

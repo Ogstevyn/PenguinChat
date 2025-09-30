@@ -1,13 +1,9 @@
-import { WalrusService } from './walrusService';
-import { Message, BackupData, SuiBlobObject } from '../types/backup';
+import { Message, SuiBlobObject } from '../types/backup';
 import { blobIdFromInt } from '@mysten/walrus';
 import { LITE_SERVER } from '@/config';
 
 export class MessageRecoveryService {
-  private walrusService: WalrusService;
-
-  constructor(privateKey: string) {
-    this.walrusService = new WalrusService(privateKey);
+  constructor() {
   }
 
   async recoverUserMessagesStream(
@@ -90,25 +86,17 @@ export class MessageRecoveryService {
       
       for (const backup of data.backups) {
         try {
-          const backupData = await this.walrusService.downloadBackup(backup.blobId);
-          
-          for (const backup of data.backups) {
-            try {
-              if (backup.backupData && this.isPenguinChatBackup(backup.backupData)) {
-                Object.values(backup.backupData.conversations).forEach(messages => {
-                  const convertedMessages = (messages as Message[]).map(msg => ({
-                    ...msg,
-                    timestamp: new Date(msg.timestamp)
-                  }));
-                  allMessages.push(...convertedMessages);
-                });
-              }
-            } catch (error) {
-              console.error(`Failed to process backup ${backup.blobId}:`, error);
-            }
+          if (backup.backupData && this.isPenguinChatBackup(backup.backupData)) {
+            Object.values(backup.backupData.conversations).forEach(messages => {
+              const convertedMessages = (messages as Message[]).map(msg => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp)
+              }));
+              allMessages.push(...convertedMessages);
+            });
           }
         } catch (error) {
-          console.error(`Failed to recover backup ${backup.blobId}:`, error);
+          console.error(`Failed to process backup ${backup.blobId}:`, error);
         }
       }
   
@@ -153,7 +141,6 @@ export class MessageRecoveryService {
       return null;
     }
   }
-
 }
 
 

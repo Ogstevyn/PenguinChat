@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useBackup } from '../contexts/BackupContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -14,7 +15,8 @@ import {
   CheckCircle, 
   AlertCircle,
   RefreshCw,
-  Wallet
+  Wallet,
+  AlertTriangle
 } from 'lucide-react';
 
 export const BackupSettings: React.FC = () => {
@@ -24,12 +26,13 @@ export const BackupSettings: React.FC = () => {
     lastBackupTimestamp, 
     performBackup, 
     updateBackupFrequency,
-    getBackupStatus 
+    getBackupStatus,
+    isBackingUp,
+    backupError
   } = useBackup();
   
   const [frequency, setFrequency] = useState(5);
   const [autoBackup, setAutoBackup] = useState(true);
-  const [isBackingUp, setIsBackingUp] = useState(false);
   const [backupStatus, setBackupStatus] = useState<any>(null);
 
   useEffect(() => {
@@ -62,7 +65,6 @@ export const BackupSettings: React.FC = () => {
   const handleManualBackup = async () => {
     if (!isInitialized) return;
     
-    setIsBackingUp(true);
     try {
       const blobId = await performBackup();
       if (blobId) {
@@ -71,8 +73,6 @@ export const BackupSettings: React.FC = () => {
       }
     } catch (error) {
       console.error('Manual backup failed:', error);
-    } finally {
-      setIsBackingUp(false);
     }
   };
 
@@ -122,6 +122,19 @@ export const BackupSettings: React.FC = () => {
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6 mb-6">
+      {/* Error Display */}
+      {backupError && (
+        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <AlertTriangle className="w-5 h-5" />
+              <span className="font-medium">Backup Error</span>
+            </div>
+            <p className="text-red-600 dark:text-red-400 text-sm mt-1">{backupError}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Backup Status Card */}
       <Card>
         <CardHeader>
@@ -225,28 +238,30 @@ export const BackupSettings: React.FC = () => {
             />
           </div>
 
-          <Button
-            onClick={handleManualBackup}
-            disabled={isBackingUp || pendingMessageCount === 0}
-            className="w-full"
-          >
-            {isBackingUp ? (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                Backing up...
-              </>
-            ) : (
-              <>
-                <CloudUpload className="w-4 h-4 mr-2" />
-                Backup Now ({pendingMessageCount} messages)
-              </>
+          <div className="pt-4 border-t">
+            <Button
+              onClick={handleManualBackup}
+              disabled={isBackingUp || pendingMessageCount === 0}
+              className="w-full"
+            >
+              {isBackingUp ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Backing up to Walrus...
+                </>
+              ) : (
+                <>
+                  <CloudUpload className="w-4 h-4 mr-2" />
+                  Backup Now ({pendingMessageCount} messages)
+                </>
+              )}
+            </Button>
+            {pendingMessageCount === 0 && (
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                No messages to backup
+              </p>
             )}
-          </Button>
-          {pendingMessageCount === 0 && (
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              No messages to backup
-            </p>
-          )}
+          </div>
         </CardContent>
       </Card>
 
@@ -261,10 +276,10 @@ export const BackupSettings: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2 text-sm">
             <p>
-              • Messages are stored locally until backup
+              • Messages are stored locally and backed up automatically every 5 minutes
             </p>
             <p>
-              • Backups are stored on Walrus
+              • Backups are stored on Walrus (Sui's decentralized storage)
             </p>
             <p>
               • Your wallet automatically owns all backup objects
