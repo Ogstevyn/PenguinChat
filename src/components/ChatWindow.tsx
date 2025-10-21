@@ -41,8 +41,8 @@ export function ChatWindow({
   const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [resolvedMessages, setResolvedMessages] = useState<any[]>([]);
-  const [attachmentErrors, setAttachmentErrors] = useState<{ [key: string]: string }>({});
-  const [globalError, setGlobalError] = useState<string | null>(null);
+  //const [attachmentErrors, setAttachmentErrors] = useState<{ [key: string]: string }>({});
+  //const [globalError, setGlobalError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -197,10 +197,10 @@ export function ChatWindow({
       } catch (err) {
         console.error('Failed to resolve messages:', err);
         setResolvedMessages([]); // Fallback to empty array to prevent crash
-        setAttachmentErrors(prev => ({
-          ...prev,
-          global: 'Chat failed to load due to server error. Please try again.',
-        }));
+        //setAttachmentErrors(prev => ({
+          //...prev,
+          //global: 'Chat failed to load due to server error. Please try again.',
+        //}));
       }
     };
     resolveMessages();
