@@ -69,7 +69,7 @@ export function ChatList({ onSelect, selectedChatId }: { onSelect?: (id: string)
       setValidStatus('resolving');
       try {
         const client = new SuiClient({ url: getFullnodeUrl('mainnet') });
-        const resolved = await client.resolveNameServiceAddress({ name: input });
+        const resolved = await client.resolveNameServiceAddress({ name: inputLower });
         
         if (isMountedRef.current) {
           if (resolved) {
@@ -101,7 +101,7 @@ export function ChatList({ onSelect, selectedChatId }: { onSelect?: (id: string)
     if (input.toLowerCase().endsWith('.sui')) {
       try {
         const client = new SuiClient({ url: getFullnodeUrl('mainnet') });
-        const resolved = await client.resolveNameServiceAddress({ name: input });
+        const resolved = await client.resolveNameServiceAddress({ name: input.toLowerCase() });
         if (!resolved) {
           setValidationError('Invalid SuiNS name');
           return;
@@ -162,7 +162,7 @@ export function ChatList({ onSelect, selectedChatId }: { onSelect?: (id: string)
     if (input.toLowerCase().endsWith('.sui')) {
       try {
         const client = new SuiClient({ url: getFullnodeUrl('mainnet') });
-        const resolved = await client.resolveNameServiceAddress({ name: input });
+        const resolved = await client.resolveNameServiceAddress({ name: input.toLowerCase() });
         if (!resolved) {
           setValidationError('Invalid SuiNS name');
           return;
