@@ -47,7 +47,12 @@ body {
 .group:hover .group-hover\:border-indigo-500\/50 {
   animation: glow 0.3s ease-in-out;
 }
-
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
 
 
 

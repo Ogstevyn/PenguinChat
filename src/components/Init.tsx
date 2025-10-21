@@ -11,7 +11,7 @@ import {
   type AuthProvider,
 } from "@mysten/enoki";
 import { motion } from 'framer-motion';
-import { FaWallet, FaGoogle } from 'react-icons/fa';
+import { FaWallet, FaGoogle, FaSpinner } from 'react-icons/fa';
 import DesktopLayout from "./DesktopLayout";
 import { useMessaging } from '../hooks/useMessaging';
 import { useSessionKey } from '../providers/SessionKeyProvider';
@@ -88,8 +88,10 @@ export function Init() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
         >
-          <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-700/30">
-            <div className="w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-full flex justify-center">
+            <div className="w-8 h-8 flex items-center justify-center">
+              <FaSpinner className="w-6 h-6 text-penguin-primary animate-spin" />
+            </div>
           </div>
           <h2 className="text-2xl font-semibold text-gray-200 mb-3 titillium-web-bold">Initializing...</h2>
           <p className="text-gray-400 text-base mb-8 max-w-md">Setting up secure messaging session...</p>

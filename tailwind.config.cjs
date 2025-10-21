@@ -4,9 +4,6 @@ module.exports = {
     './index.html',
     './src/**/*.{ts,tsx}',
   ],
-  corePlugins: {
-    preflight: false, // keep existing UI untouched
-  },
   theme: {
     extend: {
       colors: {
