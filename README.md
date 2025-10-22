@@ -1,8 +1,8 @@
-# Penguin Chat - Decentralized Messaging Platform
+# Penguin - Decentralized Messaging Platform
 
 ## 1. Executive Summary
 
-PenguinChat is a decentralized, privacy-focused messaging application built on the Sui blockchain. It leverages Walrus for decentralized storage, Seal for access control, and SuiNS for user-friendly addressing to create a secure, scalable messaging platform that puts users in control of their data.
+Penguin is a decentralized, privacy-focused messaging application built on the Sui blockchain. It leverages Walrus for decentralized storage, Seal for access control, and SuiNS for user-friendly addressing to create a secure, scalable messaging platform that puts users in control of their data.
 
 ## 2. Product Overview
 
@@ -107,16 +107,8 @@ Empower users with complete control over their messaging data through decentrali
 ### 6.2 Advanced User Stories
 - **As a user**, I want to register a SuiNS username so others can find me easily
 - **As a user**, I want to access my messages from any device so I have seamless communication
-- **As a user**, I want to send images and files so I can share media with friends
-- **As a developer**, I want to integrate PenguinChat APIs so I can add messaging to my dApp
 
 ## 7. Technical Requirements
-
-### 7.1 Performance
-- **Message Delivery**: < 1 second for online users
-- **Backup Frequency**: Every 5 minutes automatically
-- **Concurrent Users**: Support for 1000+ simultaneous connections
-- **Storage**: Efficient blob storage with compression
 
 ### 7.2 Scalability
 - **Blockchain**: Leverage Sui's 10,000+ TPS capacity

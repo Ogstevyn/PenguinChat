@@ -44,7 +44,7 @@ export function DesktopLayout() {
                 <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                   <ChatBubbleIcon className="w-8 h-8 text-indigo-400" />
                 </div>
-                <h2 className="text-xl font-semibold text-gray-200 mb-2">Welcome to PenguinChat</h2>
+                <h2 className="text-xl font-semibold text-gray-200 mb-2">Welcome to Penguin</h2>
                 <p className="text-gray-400">
                   {!isReady ? 'Initializing messaging...' : 'Select a conversation to start chatting'}
                 </p>
